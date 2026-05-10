@@ -1,0 +1,268 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+  font-family: 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif !important;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #ffffff;
+  color: #1f1f1f;
+  font-family: 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif;
+}
+
+html[dir='rtl'] {
+  direction: rtl;
+}
+
+html[dir='ltr'] {
+  direction: ltr;
+}
+
+/* Glass morphism styles */
+.glass {
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 32px 0 rgba(0, 114, 151, 0.2);
+  border-radius: 16px;
+}
+
+.glass-dark {
+  background: rgba(0, 114, 151, 0.15);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.15);
+  border-radius: 16px;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 8px 32px 0 rgba(0, 114, 151, 0.1);
+  border-radius: 16px;
+}
+
+.glass-heavy {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 32px 0 rgba(0, 114, 151, 0.15);
+  border-radius: 16px;
+}
+
+.glass-sidebar {
+  background: rgba(0, 114, 151, 0.4);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.1);
+}
+
+.glass-sidebar-rtl {
+  background: rgba(0, 114, 151, 0.4);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.1);
+}
+
+/* Override Ant Design to fit glass theme */
+.ant-card {
+  background: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 114, 151, 0.1) !important;
+  border-radius: 16px !important;
+}
+
+.ant-modal-content {
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 16px 64px 0 rgba(0, 114, 151, 0.3) !important;
+}
+
+.ant-modal-header {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(0, 114, 151, 0.2) !important;
+}
+
+.ant-btn-primary {
+  background: linear-gradient(135deg, rgb(0, 114, 151), rgb(0, 166, 207)) !important;
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(0, 114, 151, 0.3) !important;
+}
+
+.ant-btn-primary:hover {
+  background: linear-gradient(135deg, rgb(0, 166, 207), rgb(16, 154, 169)) !important;
+  box-shadow: 0 6px 16px rgba(0, 114, 151, 0.4) !important;
+}
+
+.ant-btn {
+  border-radius: 10px !important;
+  font-weight: 500 !important;
+}
+
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-select-selector,
+.ant-picker {
+  background: rgba(255, 255, 255, 0.6) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  border-radius: 10px !important;
+}
+
+.ant-input:focus,
+.ant-input-affix-wrapper:focus,
+.ant-input-focused,
+.ant-input-affix-wrapper-focused {
+  border-color: rgb(0, 114, 151) !important;
+  box-shadow: 0 0 0 2px rgba(0, 114, 151, 0.15) !important;
+}
+
+.ant-table {
+  background: transparent !important;
+}
+
+.ant-table-thead > tr > th {
+  background: rgba(0, 114, 151, 0.9) !important;
+  color: white !important;
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3) !important;
+  font-weight: 600 !important;
+}
+
+.ant-table-tbody > tr > td {
+  background: rgba(255, 255, 255, 0.5) !important;
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3) !important;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: rgba(255, 255, 255, 0.8) !important;
+}
+
+.ant-menu {
+  background: transparent !important;
+  border: none !important;
+}
+
+.ant-menu-item {
+  color: rgba(255, 255, 255, 0.85) !important;
+  border-radius: 10px !important;
+  margin: 4px 0 !important;
+}
+
+.ant-menu-item:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: white !important;
+}
+
+.ant-menu-item-selected {
+  background: rgba(255, 255, 255, 0.25) !important;
+  color: white !important;
+}
+
+.ant-menu-item-icon {
+  color: inherit !important;
+}
+
+.ant-statistic-title {
+  color: #6b7280 !important;
+  font-weight: 500 !important;
+}
+
+.ant-statistic-content {
+  color: rgb(0, 114, 151) !important;
+  font-weight: 700 !important;
+}
+
+.ant-tag {
+  border-radius: 8px !important;
+  padding: 4px 12px !important;
+  font-weight: 500 !important;
+}
+
+.ant-form-item-label > label {
+  font-weight: 500 !important;
+  color: #1f1f1f !important;
+}
+
+.ant-divider {
+  border-color: rgba(0, 114, 151, 0.2) !important;
+}
+
+/* Floating background orbs */
+.floating-orbs::before,
+.floating-orbs::after {
+  content: '';
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(80px);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.floating-orbs::before {
+  width: 400px;
+  height: 400px;
+  background: rgba(0, 166, 207, 0.25);
+  top: -100px;
+  left: -100px;
+  animation: float-slow 20s ease-in-out infinite;
+}
+
+.floating-orbs::after {
+  width: 500px;
+  height: 500px;
+  background: rgba(0, 114, 151, 0.2);
+  bottom: -150px;
+  right: -150px;
+  animation: float-slow 25s ease-in-out infinite reverse;
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(60px, 60px) scale(1.15); }
+}
+
+/* Signature canvas */
+.signature-canvas {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+}
+
+/* Scroll styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 114, 151, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 114, 151, 0.7);
+}
