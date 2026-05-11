@@ -18,11 +18,19 @@ function ProtectedRoute({
   return <>{children}</>;
 }
 
+function RootRoute() {
+  const { currentRole } = useAuthStore();
+  if (currentRole === 'visitor') return <Navigate to="/visitor" replace />;
+  if (currentRole === 'frontdesk') return <Navigate to="/frontdesk" replace />;
+  if (currentRole === 'admin') return <Navigate to="/admin" replace />;
+  return <LoginPage />;
+}
+
 export default function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<LoginPage />} />
+        <Route path="/" element={<RootRoute />} />
         <Route path="/visitor" element={<VisitorPage />} />
         <Route
           path="/frontdesk"

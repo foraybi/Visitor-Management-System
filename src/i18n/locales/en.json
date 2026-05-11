@@ -16,7 +16,7 @@
     "required": "This field is required"
   },
   "visitor": {
-    "welcome": "Welcome to VMS",
+    "welcome": "Welcome to Zuaar",
     "enterTitle": "New Visit Registration",
     "exitTitle": "Check Out",
     "personalInfo": "Personal Information",
@@ -38,9 +38,18 @@
     "signatureClear": "Clear",
     "idGenerated": "Your Visitor ID",
     "photoReminder": "Please photograph your visitor ID and keep it with you",
-    "visitorIdPlaceholder": "Enter your visitor ID (e.g., VST-001)",
+    "visitorIdPlaceholder": "Enter your visitor ID (e.g., 0001)",
     "exitSuccess": "You have successfully checked out",
     "exitError": "Visitor ID not found. Please check and try again.",
+    "employeePhone": "Employee Phone",
+    "employeeNumber": "Employee Number",
+    "employeeNumberPlaceholder": "0001",
+    "agreeToTerms": "I agree to the terms and conditions",
+    "termsTitle": "Terms and Conditions",
+    "termsContent": "By entering, you agree to follow building rules, present a valid ID upon request, and abide by visitor conduct policies. Your information may be used for security and emergency purposes.",
+    "kioskStart": "Tap to begin",
+    "kioskResume": "Tap to resume",
+    "draftRestored": "Your previous form has been restored",
     "validation": {
       "nameMin": "Name must be at least 2 characters",
       "phoneFormat": "Phone must start with 05 and be 10 digits",
@@ -52,7 +61,9 @@
       "passportMin": "Passport must be at least 5 characters",
       "signatureRequired": "Please provide your signature",
       "floorRequired": "Please select a floor",
-      "selectType": "Please select an option"
+      "selectType": "Please select an option",
+      "employeeNotFound": "No matching employee. Check phone and employee number.",
+      "termsRequired": "You must agree to the terms and conditions"
     }
   },
   "frontdesk": {

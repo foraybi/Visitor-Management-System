@@ -27,7 +27,7 @@ export default function MainScreen() {
     <div className="floating-orbs min-h-screen flex flex-col">
       <div className="flex justify-between items-center p-6">
         <Title level={2} style={{ color: 'rgb(0, 114, 151)', margin: 0 }}>
-          VMS
+          نظام إدارة الزوار "زوار"
         </Title>
         <Button
           type="primary"
@@ -76,7 +76,7 @@ export default function MainScreen() {
                   style={{ fontSize: 96, color: 'rgb(127, 188, 66)' }}
                 />
               </div>
-              <Title level={2} style={{ color: 'rgb(0, 114, 151)', margin: 0 }}>
+              <Title level={2} style={{ color: 'rgb(127, 188, 66)', margin: 0 }}>
                 {t('common.enter')}
               </Title>
               <Paragraph style={{ color: '#6b7280', marginTop: 8 }}>
@@ -105,13 +105,13 @@ export default function MainScreen() {
                 }}
               >
                 <LogoutOutlined
-                  style={{ fontSize: 96, color: 'rgb(5, 99, 193)' }}
+                  style={{ fontSize: 96, color: 'rgba(234, 12, 23, 1)' }}
                 />
               </div>
-              <Title level={2} style={{ color: 'rgb(0, 114, 151)', margin: 0 }}>
+              <Title level={2} style={{ color: 'rgba(221, 50, 70, 1)', margin: 0 }}>
                 {t('common.exit')}
               </Title>
-              <Paragraph style={{ color: '#6b7280', marginTop: 8 }}>
+              <Paragraph style={{ color: '#000000ff', marginTop: 8 }}>
                 {t('visitor.exitTitle')}
               </Paragraph>
             </Card>

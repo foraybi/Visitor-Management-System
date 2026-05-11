@@ -120,27 +120,236 @@ html[dir='ltr'] {
 
 .ant-input,
 .ant-input-affix-wrapper,
-.ant-select-selector,
-.ant-picker {
-  background: rgba(255, 255, 255, 0.6) !important;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+.ant-picker,
+.ant-input-number,
+textarea.ant-input {
+  background: #ffffff !important;
+  border: 1px solid #d9d9d9 !important;
   border-radius: 10px !important;
+}
+
+/* Select needs higher specificity — target the inner selector directly */
+.ant-select:not(.ant-select-customize-input) .ant-select-selector,
+.ant-select-single .ant-select-selector,
+.ant-select-multiple .ant-select-selector,
+.ant-select-lg .ant-select-selector {
+  background: #ffffff !important;
+  border: 1px solid #d9d9d9 !important;
+  border-radius: 10px !important;
+}
+
+/* Make sure the large-size select keeps the height while showing border */
+.ant-select-lg .ant-select-selector {
+  min-height: 40px !important;
+}
+
+.ant-select:not(.ant-select-disabled):hover .ant-select-selector {
+  border-color: rgb(0, 114, 151) !important;
+}
+
+.ant-select-focused:not(.ant-select-disabled) .ant-select-selector,
+.ant-select-open .ant-select-selector {
+  border-color: rgb(0, 114, 151) !important;
+  box-shadow: 0 0 0 2px rgba(0, 114, 151, 0.12) !important;
+}
+
+/* Select dropdown menu styling */
+.ant-select-dropdown {
+  border: 1px solid #d9d9d9 !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08) !important;
+}
+
+.ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+  background-color: rgba(0, 114, 151, 0.1) !important;
+  color: rgb(0, 114, 151) !important;
+  font-weight: 600 !important;
+}
+
+.ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+  background-color: rgba(0, 166, 207, 0.1) !important;
+}
+
+.ant-input:hover,
+.ant-input-affix-wrapper:hover,
+.ant-select:hover .ant-select-selector,
+.ant-picker:hover,
+.ant-input-number:hover {
+  border-color: rgb(0, 114, 151) !important;
+
 }
 
 .ant-input:focus,
 .ant-input-affix-wrapper:focus,
 .ant-input-focused,
-.ant-input-affix-wrapper-focused {
+.ant-input-affix-wrapper-focused,
+.ant-select-focused .ant-select-selector,
+.ant-picker-focused,
+.ant-input-number-focused {
   border-color: rgb(0, 114, 151) !important;
-  box-shadow: 0 0 0 2px rgba(0, 114, 151, 0.15) !important;
+  box-shadow: 0 0 0 2px rgba(0, 114, 151, 0.12) !important;
+}
+
+/* Checkbox */
+.ant-checkbox-inner {
+  border: 1px solid #d9d9d9 !important;
+  border-radius: 4px !important;
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.ant-checkbox-checked .ant-checkbox-inner {
+  background-color: rgb(0, 114, 151) !important;
+  border-color: rgb(0, 114, 151) !important;
+}
+
+.ant-checkbox-wrapper:hover .ant-checkbox-inner,
+.ant-checkbox:hover .ant-checkbox-inner {
+  border-color: rgb(0, 114, 151) !important;
+}
+
+/* Visitor Enter form — larger font (24px) for kiosk readability */
+.enter-form-large .ant-form-item-label > label {
+  font-size: 24px !important;
+  line-height: 1.4 !important;
+}
+
+.enter-form-large .ant-input,
+.enter-form-large .ant-input-affix-wrapper,
+.enter-form-large .ant-input-affix-wrapper input,
+.enter-form-large .ant-select-selector,
+.enter-form-large .ant-select-selection-item,
+.enter-form-large .ant-select-selection-placeholder,
+.enter-form-large .ant-select-selection-search-input,
+.enter-form-large input,
+.enter-form-large textarea {
+  font-size: 24px !important;
+  line-height: 1.4 !important;
+}
+
+.enter-form-large .ant-select-lg .ant-select-selector,
+.enter-form-large .ant-input-lg,
+.enter-form-large .ant-input-affix-wrapper-lg {
+  min-height: 56px !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+
+.enter-form-large .ant-select-lg .ant-select-selection-item,
+.enter-form-large .ant-select-lg .ant-select-selection-placeholder {
+  line-height: 44px !important;
+  font-size: 24px !important;
+}
+
+/* Larger placeholder text across all selects (not just enter-form) */
+.ant-select-selection-placeholder {
+  font-size: 18px !important;
+  color: #8c8c8c !important;
+}
+
+.ant-select-lg .ant-select-selection-placeholder {
+  font-size: 20px !important;
+}
+
+/* Inside the visitor form, make it even larger */
+.enter-form-large .ant-select-selection-placeholder {
+  font-size: 24px !important;
+}
+
+/* Also bump input placeholders to match */
+.enter-form-large input::placeholder,
+.enter-form-large .ant-input::placeholder {
+  font-size: 24px !important;
+}
+
+.enter-form-large .ant-checkbox + span {
+  font-size: 24px !important;
+}
+
+.enter-form-large .ant-checkbox-inner {
+  width: 28px !important;
+  height: 28px !important;
+}
+
+.enter-form-large .ant-checkbox-inner::after {
+  width: 8px !important;
+  height: 14px !important;
+}
+
+.enter-form-large .ant-btn-lg {
+  font-size: 22px !important;
+  height: 56px !important;
+  padding: 0 32px !important;
+}
+
+.enter-form-large .ant-form-item-explain-error {
+  font-size: 16px !important;
+}
+
+/* Dropdown popup items also larger */
+.enter-form-dropdown .ant-select-item {
+  font-size: 22px !important;
+  min-height: 48px !important;
+  line-height: 1.4 !important;
+  padding: 10px 16px !important;
+}
+
+/* Terms & conditions checkbox container */
+.terms-box {
+  background: #ffffff !important;
+  border: 1px solid #d9d9d9 !important;
+  border-radius: 10px !important;
+  padding: 12px 16px !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.terms-box:hover,
+.terms-box:focus-within {
+  border-color: rgb(0, 114, 151) !important;
+  box-shadow: 0 0 0 3px rgba(0, 114, 151, 0.12) !important;
+}
+
+/* Invisible kiosk exit button — bottom-left corner */
+.kiosk-exit-btn {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  width: 60px !important;
+  height: 60px !important;
+  background: transparent !important;
+  border: none !important;
+  cursor: default !important;
+  z-index: 99999 !important;
+  opacity: 0 !important;
+}
+
+.kiosk-exit-btn:hover {
+  opacity: 0 !important;
+}
+
+html[dir='rtl'] .kiosk-exit-btn {
+  left: auto !important;
+  right: 0 !important;
+}
+
+/* Red * mark for required fields, visible even when requiredMark=false */
+.ant-form-item-required::before,
+.ant-form-item-label>label.ant-form-item-required::before {
+  display: inline-block !important;
+  margin-inline-end: 4px !important;
+  color: #ff0000 !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  content: '*' !important;
 }
 
 .ant-table {
   background: transparent !important;
 }
 
-.ant-table-thead > tr > th {
+.ant-table-thead>tr>th {
   background: rgba(0, 114, 151, 0.9) !important;
   color: white !important;
   backdrop-filter: blur(10px);
@@ -148,13 +357,13 @@ html[dir='ltr'] {
   font-weight: 600 !important;
 }
 
-.ant-table-tbody > tr > td {
+.ant-table-tbody>tr>td {
   background: rgba(255, 255, 255, 0.5) !important;
   backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.3) !important;
 }
 
-.ant-table-tbody > tr:hover > td {
+.ant-table-tbody>tr:hover>td {
   background: rgba(255, 255, 255, 0.8) !important;
 }
 
@@ -199,7 +408,7 @@ html[dir='ltr'] {
   font-weight: 500 !important;
 }
 
-.ant-form-item-label > label {
+.ant-form-item-label>label {
   font-weight: 500 !important;
   color: #1f1f1f !important;
 }
@@ -238,8 +447,15 @@ html[dir='ltr'] {
 }
 
 @keyframes float-slow {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(60px, 60px) scale(1.15); }
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate(60px, 60px) scale(1.15);
+  }
 }
 
 /* Signature canvas */

@@ -15,9 +15,9 @@ export default function ExitModal({ onClose }: ExitModalProps) {
   const [form] = Form.useForm();
 
   const handleSubmit = (values: { visitorId: string }) => {
-    const normalizedId = values.visitorId.toUpperCase().trim();
-    if (!/^VST-\d{3,}$/.test(normalizedId)) {
-      message.error('Invalid format. Use VST-001');
+    const normalizedId = values.visitorId.trim().padStart(4, '0');
+    if (!/^\d{4}$/.test(normalizedId)) {
+      message.error('Invalid format. Use a 4-digit number (e.g. 0001)');
       return;
     }
     const result = exitVisitor(normalizedId);
@@ -70,15 +70,26 @@ export default function ExitModal({ onClose }: ExitModalProps) {
           rules={[
             { required: true, message: 'Please enter your visitor ID' },
             {
-              pattern: /^VST-\d{3,}$/i,
-              message: 'Format: VST-001',
+              pattern: /^\d{1,4}$/,
+              message: 'Format: 4-digit number (e.g. 0001)',
             },
           ]}
         >
           <Input
             size="large"
-            placeholder="VST-001"
-            style={{ textTransform: 'uppercase' }}
+            inputMode="numeric"
+            type="tel"
+            placeholder="0001"
+            maxLength={4}
+            autoFocus
+            onKeyDown={(e) => {
+              if (
+                !/^[0-9]$/.test(e.key) &&
+                !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End', 'Enter'].includes(e.key)
+              ) {
+                e.preventDefault();
+              }
+            }}
           />
         </Form.Item>
 

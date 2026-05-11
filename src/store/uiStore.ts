@@ -6,8 +6,8 @@ import i18n from '../i18n';
 export const useUIStore = create<UIState>()(
   persist(
     (set, get) => ({
-      language: 'en',
-      dir: 'ltr',
+      language: 'ar',
+      dir: 'rtl',
       sidebarOpen: true,
 
       toggleLanguage: () => {

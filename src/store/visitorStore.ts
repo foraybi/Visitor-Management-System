@@ -11,9 +11,9 @@ export const useVisitorStore = create<VisitorState>()(
       visitors: [],
 
       addVisitor: (data: EnterFormData) => {
-        const existingIds = get().visitors.map(v => v.id);
-        const newId = generateVisitorId(existingIds);
-        // Store the English name as canonical; display can localize later
+        const today = getTodayDateString();
+        const existing = get().visitors.map(v => ({ id: v.id, date: v.date }));
+        const newId = generateVisitorId(existing, today);
         const newVisitor: Visitor = {
           ...data,
           id: newId,
@@ -21,7 +21,7 @@ export const useVisitorStore = create<VisitorState>()(
           entryTime: getCurrentTimestamp(),
           exitTime: null,
           status: 'active',
-          date: getTodayDateString(),
+          date: today,
         };
         set(state => ({ visitors: [...state.visitors, newVisitor] }));
         return newId;

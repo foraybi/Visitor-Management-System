@@ -22,8 +22,8 @@ export function useSeedData() {
         floor: 1,
         employeeCount: 2,
         employees: [
-          { id: 'e1', name: 'Ahmed Al-Rashidi', phone: '0501234567', gender: 'male' },
-          { id: 'e2', name: 'Sara Al-Qahtani', phone: '0507654321', gender: 'female' },
+          { id: 'e1', employeeNumber: '0001', name: 'Ahmed Al-Rashidi', phone: '0501234567', gender: 'male' },
+          { id: 'e2', employeeNumber: '0002', name: 'Sara Al-Qahtani', phone: '0507654321', gender: 'female' },
         ],
       });
 
@@ -35,7 +35,7 @@ export function useSeedData() {
         floor: 2,
         employeeCount: 1,
         employees: [
-          { id: 'e3', name: 'Fatima Al-Otaibi', phone: '0505555555', gender: 'female' },
+          { id: 'e3', employeeNumber: '0003', name: 'Fatima Al-Otaibi', phone: '0505555555', gender: 'female' },
         ],
       });
 
@@ -47,7 +47,7 @@ export function useSeedData() {
         floor: 3,
         employeeCount: 1,
         employees: [
-          { id: 'e4', name: 'Mohammed Al-Dossary', phone: '0503333333', gender: 'male' },
+          { id: 'e4', employeeNumber: '0004', name: 'Mohammed Al-Dossary', phone: '0503333333', gender: 'male' },
         ],
       });
     }

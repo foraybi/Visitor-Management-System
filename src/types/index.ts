@@ -33,6 +33,7 @@ export interface Visitor {
 
 export interface Employee {
   id: string;
+  employeeNumber: string;
   name: string;
   phone: string;
   gender: 'male' | 'female';

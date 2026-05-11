@@ -24,6 +24,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { useCompanyStore } from '../../store/companyStore';
 import { useFloorStore } from '../../store/floorStore';
+import { generateEmployeeNumber } from '../../utils/idGenerator';
 import type { Company, Employee } from '../../types';
 
 const { Title } = Typography;
@@ -72,6 +73,9 @@ export default function ManagementTab() {
   const openAddEmployee = (companyId: string) => {
     setSelectedCompanyId(companyId);
     employeeForm.resetFields();
+    // Auto-fill next 4-digit employee number across all companies
+    const allNumbers = companies.flatMap(c => c.employees.map(e => e.employeeNumber));
+    employeeForm.setFieldValue('employeeNumber', generateEmployeeNumber(allNumbers));
     setEmployeeModalOpen(true);
   };
 
