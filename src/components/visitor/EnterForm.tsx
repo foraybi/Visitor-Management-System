@@ -4,6 +4,7 @@ import {
   Form,
   Input,
   Select,
+  Radio,
   Button,
   Space,
   Divider,
@@ -28,6 +29,7 @@ import { useVisitorStore } from '../../store/visitorStore';
 import { useCompanyStore } from '../../store/companyStore';
 import { useFloorStore } from '../../store/floorStore';
 import { useUIStore } from '../../store/uiStore';
+import { useFormConfigStore } from '../../store/formConfigStore';
 import { countries } from '../../utils/countryData';
 import VisitorIdCard from './VisitorIdCard';
 import FloorGrid from './FloorGrid';
@@ -55,15 +57,16 @@ export default function EnterForm({ onClose }: EnterFormProps) {
   const { addVisitor } = useVisitorStore();
   const { companies } = useCompanyStore();
   const { floors } = useFloorStore();
+  const formFields = useFormConfigStore(state => state.fields);
+  const isFieldVisible = (key: string) =>
+    formFields.find(f => f.key === key)?.visible ?? true;
 
   // Refs for keyboard navigation
-  const visitorTypeRef = useRef<RefSelectProps>(null);
   const companyRef = useRef<RefSelectProps>(null);
   const empPhoneRef = useRef<InputRef>(null);
   const empNumberRef = useRef<InputRef>(null);
   const nameRef = useRef<InputRef>(null);
   const phoneRef = useRef<InputRef>(null);
-  const idTypeRef = useRef<RefSelectProps>(null);
   const idNumberRef = useRef<InputRef>(null);
   const countryRef = useRef<RefSelectProps>(null);
 
@@ -172,9 +175,11 @@ export default function EnterForm({ onClose }: EnterFormProps) {
       message.error(t('visitor.validation.floorRequired'));
       return;
     }
-    if (!sigCanvasRef.current || sigCanvasRef.current.isEmpty()) {
-      message.error(t('visitor.validation.signatureRequired'));
-      return;
+    if (isFieldVisible('signature')) {
+      if (!sigCanvasRef.current || sigCanvasRef.current.isEmpty()) {
+        message.error(t('visitor.validation.signatureRequired'));
+        return;
+      }
     }
     if (!values.agreedToTerms) {
       message.error(t('visitor.validation.termsRequired'));
@@ -189,10 +194,11 @@ export default function EnterForm({ onClose }: EnterFormProps) {
         message.error(t('visitor.validation.employeeNotFound'));
         return;
       }
-      const signatureDataUrl = sigCanvasRef.current.toDataURL();
+      const signatureDataUrl = sigCanvasRef.current?.toDataURL() ?? '';
       data = {
         name: match.employee.name,
         phone: match.employee.phone,
+        email: values.email,
         nationalityType: 'national_id',
         nationalityIdNumber: match.employee.employeeNumber,
         countryCode: 'SA',
@@ -202,10 +208,11 @@ export default function EnterForm({ onClose }: EnterFormProps) {
         signatureDataUrl,
       };
     } else {
-      const signatureDataUrl = sigCanvasRef.current.toDataURL();
+      const signatureDataUrl = sigCanvasRef.current?.toDataURL() ?? '';
       data = {
         name: values.name,
         phone: values.phone,
+        email: values.email,
         nationalityType: values.nationalityType,
         nationalityIdNumber: values.nationalityIdNumber,
         countryCode: values.countryCode,
@@ -281,18 +288,18 @@ export default function EnterForm({ onClose }: EnterFormProps) {
                   name="visitorType"
                   rules={[{ required: true, message: t('common.required') }]}
                 >
-                  <Select
-                    ref={visitorTypeRef}
+                  <Radio.Group
                     size="large"
-                    classNames={{ popup: { root: 'enter-form-dropdown' } }}
-                    placeholder={t('visitor.validation.selectType')}
+                    optionType="button"
+                    buttonStyle="solid"
                     options={visitorTypeOptions}
-                    onChange={(val: VisitorType) => {
+                    onChange={(e) => {
+                      const val: VisitorType = e.target.value;
                       setVisitorType(val);
-                      // Clear personal info on switch
                       form.setFieldsValue({
                         name: undefined,
                         phone: undefined,
+                        email: undefined,
                         nationalityType: undefined,
                         nationalityIdNumber: undefined,
                         countryCode: undefined,
@@ -447,11 +454,31 @@ export default function EnterForm({ onClose }: EnterFormProps) {
                       maxLength={10}
                       onPressEnter={(e) => {
                         e.preventDefault();
-                        idTypeRef.current?.focus();
+                        idNumberRef.current?.focus();
                       }}
                     />
                   </Form.Item>
                 </Col>
+
+                {isFieldVisible('email') && (
+                  <Col xs={24} md={12}>
+                    <Form.Item
+                      label={t('visitor.email')}
+                      name="email"
+                      rules={[
+                        { type: 'email', message: t('visitor.validation.emailFormat') },
+                      ]}
+                    >
+                      <Input
+                        size="large"
+                        type="email"
+                        inputMode="email"
+                        placeholder={t('visitor.emailPlaceholder')}
+                        autoComplete="email"
+                      />
+                    </Form.Item>
+                  </Col>
+                )}
 
                 <Col xs={24} md={12}>
                   <Form.Item
@@ -459,20 +486,19 @@ export default function EnterForm({ onClose }: EnterFormProps) {
                     name="nationalityType"
                     rules={[{ required: true, message: t('common.required') }]}
                   >
-                    <Select
-                      ref={idTypeRef}
+                    <Radio.Group
                       size="large"
-                      classNames={{ popup: { root: 'enter-form-dropdown' } }}
-                      placeholder={t('visitor.validation.selectType')}
+                      optionType="button"
+                      buttonStyle="solid"
                       options={[
                         { value: 'national_id', label: nationalityLabels.national_id },
                         { value: 'iqama', label: nationalityLabels.iqama },
                         { value: 'passport', label: nationalityLabels.passport },
                       ]}
-                      onChange={(val: NationalityType) => {
+                      onChange={(e) => {
+                        const val: NationalityType = e.target.value;
                         setNationalityType(val);
                         form.setFieldValue('nationalityIdNumber', '');
-                        // Auto-select Saudi Arabia when National ID is chosen
                         if (val === 'national_id') {
                           form.setFieldValue('countryCode', 'SA');
                         }
@@ -551,40 +577,42 @@ export default function EnterForm({ onClose }: EnterFormProps) {
             )}
           </Card>
 
-          {/* ─── Signature ─── */}
-          <Card
-            style={{ marginBottom: 16 }}
-            title={
-              <Space>
-                <EditOutlined style={{ color: 'rgb(0, 114, 151)', fontSize: 20 }} />
-                <Title level={4} style={{ margin: 0, color: 'rgb(0, 114, 151)' }}>
-                  {t('visitor.signatureSection')}
-                </Title>
-              </Space>
-            }
-          >
-            <div
-              style={{
-                border: '2px dashed rgba(0, 114, 151, 0.3)',
-                borderRadius: 12,
-                overflow: 'hidden',
-                background: 'rgba(255,255,255,0.9)',
-              }}
+          {/* ─── Signature (only when enabled in form editor) ─── */}
+          {isFieldVisible('signature') && (
+            <Card
+              style={{ marginBottom: 16 }}
+              title={
+                <Space>
+                  <EditOutlined style={{ color: 'rgb(0, 114, 151)', fontSize: 20 }} />
+                  <Title level={4} style={{ margin: 0, color: 'rgb(0, 114, 151)' }}>
+                    {t('visitor.signatureSection')}
+                  </Title>
+                </Space>
+              }
             >
-              <SignatureCanvas
-                ref={sigCanvasRef}
-                canvasProps={{
-                  style: { width: '100%', height: 200, cursor: 'crosshair' },
+              <div
+                style={{
+                  border: '2px dashed rgba(0, 114, 151, 0.3)',
+                  borderRadius: 12,
+                  overflow: 'hidden',
+                  background: 'rgba(255,255,255,0.9)',
                 }}
-              />
-            </div>
-            <Button
-              onClick={() => sigCanvasRef.current?.clear()}
-              style={{ marginTop: 12 }}
-            >
-              {t('visitor.signatureClear')}
-            </Button>
-          </Card>
+              >
+                <SignatureCanvas
+                  ref={sigCanvasRef}
+                  canvasProps={{
+                    style: { width: '100%', height: 200, cursor: 'crosshair' },
+                  }}
+                />
+              </div>
+              <Button
+                onClick={() => sigCanvasRef.current?.clear()}
+                style={{ marginTop: 12 }}
+              >
+                {t('visitor.signatureClear')}
+              </Button>
+            </Card>
+          )}
 
           {/* ─── Terms + Submit ─── */}
           <Card styles={{ body: { padding: 16 } }}>

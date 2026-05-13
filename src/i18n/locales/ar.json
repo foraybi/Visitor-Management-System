@@ -1,5 +1,6 @@
 {
   "common": {
+    "appName": "نظام إدارة الزوار \"زوار\"",
     "enter": "دخول",
     "exit": "خروج",
     "submit": "إرسال",
@@ -25,6 +26,8 @@
     "name": "الاسم الكامل",
     "namePlaceholder": "محمد أحمد",
     "phone": "رقم الهاتف",
+    "email": "البريد الإلكتروني",
+    "emailPlaceholder": "name@example.com",
     "nationalityType": "نوع الهوية",
     "nationalityId": "رقم الهوية",
     "country": "الدولة",
@@ -63,7 +66,8 @@
       "floorRequired": "يرجى اختيار الطابق",
       "selectType": "يرجى اختيار خيار",
       "employeeNotFound": "لا يوجد موظف مطابق. تحقق من رقم الهاتف والرقم الوظيفي.",
-      "termsRequired": "يجب الموافقة على الشروط والأحكام"
+      "termsRequired": "يجب الموافقة على الشروط والأحكام",
+      "emailFormat": "يرجى إدخال بريد إلكتروني صحيح"
     }
   },
   "frontdesk": {
@@ -75,8 +79,24 @@
     "mostVisited": "الطابق الأكثر زيارة",
     "exportPdf": "تصدير PDF",
     "exportExcel": "تصدير Excel",
+    "exportReportTitle": "تقرير إدارة الزوار",
+    "exportGenerated": "تاريخ التقرير",
+    "exportFilter": "التصفية",
+    "exportSheetName": "الزوار",
     "filterByFloor": "تصفية حسب الطابق",
-    "allFloors": "جميع الطوابق"
+    "allFloors": "جميع الطوابق",
+    "filterByDate": "تصفية حسب التاريخ",
+    "today": "اليوم",
+    "allDates": "كل التواريخ",
+    "dateRange": "نطاق التاريخ",
+    "from": "من",
+    "to": "إلى",
+    "viewBy": "عرض حسب",
+    "day": "يوم",
+    "week": "أسبوع",
+    "month": "شهر",
+    "year": "سنة",
+    "all": "الكل"
   },
   "table": {
     "visitorId": "معرف الزائر",
@@ -88,7 +108,11 @@
     "exitTime": "وقت الخروج",
     "actions": "الإجراءات",
     "active": "نشط",
-    "exited": "خرج"
+    "exited": "خرج",
+    "email": "البريد الإلكتروني",
+    "idNumber": "رقم الهوية",
+    "companyName": "الشركة",
+    "timeSpent": "المدة"
   },
   "company": {
     "name": "اسم الشركة",
@@ -118,7 +142,37 @@
     "floorNumber": "رقم الطابق",
     "floorName": "اسم الطابق",
     "floorImage": "صورة الطابق",
-    "analytics": "التحليلات"
+    "analytics": "التحليلات",
+    "documentSettings": "إعدادات المستند",
+    "documentSettingsDescription": "تخصيص الترويسة التي تظهر على كل ملف PDF / Excel مُصدَّر. الشعار واسم النموذج وثلاثة أزواج من العنوان/القيمة.",
+    "documentAdmissionLabel": "عنوان الإصدار",
+    "documentAdmissionValue": "اسم الإصدار",
+    "documentFormIdLabel": "عنوان رقم النموذج / الإصدار",
+    "documentFormIdValue": "رقم النموذج / الإصدار",
+    "documentVisionLabel": "عنوان رقم الرؤية",
+    "documentVisionValue": "رقم الرؤية",
+    "documentFormName": "اسم النموذج",
+    "documentLogo": "الشعار",
+    "uploadLogo": "رفع الشعار",
+    "removeLogo": "إزالة الشعار",
+    "formEditor": "محرر النموذج",
+    "formEditorDescription": "تحكم في الحقول الظاهرة في نموذج تسجيل الزائر وأعد ترتيبها. اسحب الصفوف لإعادة الترتيب.",
+    "fieldVisible": "ظاهر",
+    "fieldHidden": "مخفي",
+    "resetToDefault": "استعادة الافتراضي",
+    "field": {
+      "visitorType": "نوع الزائر",
+      "visitedCompanyId": "الشركة المزارة",
+      "floor": "الطابق",
+      "name": "الاسم الكامل",
+      "phone": "رقم الهاتف",
+      "email": "البريد الإلكتروني",
+      "nationalityType": "نوع الهوية",
+      "nationalityIdNumber": "رقم الهوية",
+      "countryCode": "الدولة",
+      "signature": "التوقيع",
+      "terms": "الشروط والأحكام"
+    }
   },
   "login": {
     "selectRole": "اختر دورك",

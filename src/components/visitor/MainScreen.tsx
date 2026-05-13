@@ -27,7 +27,7 @@ export default function MainScreen() {
     <div className="floating-orbs min-h-screen flex flex-col">
       <div className="flex justify-between items-center p-6">
         <Title level={2} style={{ color: 'rgb(0, 114, 151)', margin: 0 }}>
-          نظام إدارة الزوار "زوار"
+          {t('common.appName')}
         </Title>
         <Button
           type="primary"

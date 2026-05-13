@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Typography, Space, Flex } from 'antd';
+import { Typography, Space } from 'antd';
 import { useUIStore } from '../store/uiStore';
 import Sidebar from '../components/frontdesk/Sidebar';
 import StatCards from '../components/frontdesk/StatCards';
 import VisitorTable from '../components/frontdesk/VisitorTable';
 import CompaniesTab from '../components/frontdesk/CompaniesTab';
-import ExportButtons from '../components/frontdesk/ExportButtons';
 
 const { Title } = Typography;
 
@@ -30,12 +29,9 @@ export default function FrontDeskPage() {
       >
         {activeTab === 'visitors' ? (
           <Space direction="vertical" size="large" style={{ width: '100%' }}>
-            <Flex justify="space-between" align="center" wrap="wrap" gap="middle">
-              <Title level={2} style={{ color: 'rgb(0, 114, 151)', margin: 0 }}>
-                {t('frontdesk.visitors')}
-              </Title>
-              <ExportButtons />
-            </Flex>
+            <Title level={2} style={{ color: 'rgb(0, 114, 151)', margin: 0 }}>
+              {t('frontdesk.visitors')}
+            </Title>
             <StatCards />
             <VisitorTable />
           </Space>

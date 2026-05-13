@@ -8,6 +8,8 @@ import {
   SettingOutlined,
   PieChartOutlined,
   AppstoreOutlined,
+  FormOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons';
 import { useUIStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
@@ -66,6 +68,16 @@ export default function Sidebar({
             icon: <SettingOutlined />,
             label: t('admin.manageUsers'),
           },
+          {
+            key: 'formEditor',
+            icon: <FormOutlined />,
+            label: t('admin.formEditor'),
+          },
+          {
+            key: 'documentSettings',
+            icon: <FileTextOutlined />,
+            label: t('admin.documentSettings'),
+          },
         ]
       : []),
   ];
@@ -85,8 +97,8 @@ export default function Sidebar({
       }}
     >
       <div style={{ padding: 24, borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
-        <Title level={2} style={{ color: 'white', margin: 0 }}>
-          VMS
+        <Title level={4} style={{ color: 'white', margin: 0 }}>
+          {t('common.appName')}
         </Title>
         <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
           {currentRole === 'admin' ? t('login.admin') : t('login.frontDesk')}

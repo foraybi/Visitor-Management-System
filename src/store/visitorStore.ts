@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Visitor, VisitorState, EnterFormData } from '../types';
 import { generateVisitorId } from '../utils/idGenerator';
 import { getCurrentTimestamp, getTodayDateString } from '../utils/timeUtils';
@@ -53,6 +53,26 @@ export const useVisitorStore = create<VisitorState>()(
         return get().visitors.filter(v => v.status === 'active');
       },
     }),
-    { name: 'vms-visitors' }
+    {
+      name: 'vms-visitors',
+      storage: createJSONStorage(() => localStorage),
+    }
   )
 );
+
+// Cross-tab sync: when another tab/window updates the visitors in localStorage,
+// re-hydrate this tab's store so Front Desk / Admin see new entries live.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'vms-visitors' && e.newValue) {
+      try {
+        const parsed = JSON.parse(e.newValue);
+        if (parsed?.state?.visitors) {
+          useVisitorStore.setState({ visitors: parsed.state.visitors });
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
+  });
+}

@@ -15,11 +15,12 @@ import {
 
 export default function StatCards() {
   const { t } = useTranslation();
-  const { getTodayVisitors, getActiveVisitors } = useVisitorStore();
+  // Subscribe to the visitors array directly so stats refresh on changes
+  const visitors = useVisitorStore(state => state.visitors);
 
-  const todayVisitors = getTodayVisitors();
   const today = getTodayDateString();
-  const activeToday = getActiveVisitors().filter(v => v.date === today);
+  const todayVisitors = visitors.filter(v => v.date === today);
+  const activeToday = todayVisitors.filter(v => v.status === 'active');
 
   const stats = [
     {

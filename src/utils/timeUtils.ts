@@ -38,6 +38,25 @@ export function computeTotalHoursToday(visitors: Visitor[]): string {
   return `${(totalMs / 3_600_000).toFixed(1)} hrs`;
 }
 
+/**
+ * Time spent between entryTime and exitTime (or now, if still active).
+ * Returns "Hh Mm" e.g. "2h 15m" or "45m". Returns "—" if no entryTime.
+ */
+export function formatTimeSpent(
+  entryTime: string | null,
+  exitTime: string | null
+): string {
+  if (!entryTime) return '—';
+  const end = exitTime ? new Date(exitTime).getTime() : Date.now();
+  const ms = end - new Date(entryTime).getTime();
+  if (ms < 0) return '—';
+  const totalMinutes = Math.floor(ms / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes}m`;
+  return `${hours}h ${minutes}m`;
+}
+
 export function getMostVisitedFloor(visitors: Visitor[]): string {
   const counts: Record<number, number> = {};
   visitors.forEach(v => {

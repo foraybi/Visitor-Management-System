@@ -191,6 +191,70 @@ textarea.ant-input {
   box-shadow: 0 0 0 2px rgba(0, 114, 151, 0.12) !important;
 }
 
+/* Radio buttons (used for Visitor Type & ID Type) */
+.ant-radio-button-wrapper {
+  background: #ffffff !important;
+  border: 1px solid #d9d9d9 !important;
+  color: #1f1f1f !important;
+  transition: all 0.2s ease !important;
+}
+
+.ant-radio-button-wrapper:not(:first-child)::before {
+  background-color: #d9d9d9 !important;
+}
+
+.ant-radio-button-wrapper:hover {
+  color: rgb(0, 114, 151) !important;
+  border-color: rgb(0, 114, 151) !important;
+}
+
+.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled) {
+  background: rgb(0, 114, 151) !important;
+  border-color: rgb(0, 114, 151) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 2px rgba(0, 114, 151, 0.18) !important;
+}
+
+.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled):hover {
+  background: rgb(0, 166, 207) !important;
+  border-color: rgb(0, 166, 207) !important;
+  color: #ffffff !important;
+}
+
+.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled)::before {
+  background-color: rgb(0, 114, 151) !important;
+}
+
+/* Standard (non-button) radios */
+.ant-radio-inner {
+  border: 1px solid #d9d9d9 !important;
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.ant-radio-checked .ant-radio-inner {
+  border-color: rgb(0, 114, 151) !important;
+  background-color: rgb(0, 114, 151) !important;
+}
+
+.ant-radio-wrapper:hover .ant-radio-inner,
+.ant-radio:hover .ant-radio-inner {
+  border-color: rgb(0, 114, 151) !important;
+}
+
+/* Visitor form — larger radio buttons */
+.enter-form-large .ant-radio-button-wrapper {
+  font-size: 22px !important;
+  height: 56px !important;
+  line-height: 54px !important;
+  padding: 0 28px !important;
+}
+
+.enter-form-large .ant-radio-wrapper,
+.enter-form-large .ant-radio-button-wrapper + span {
+  font-size: 22px !important;
+}
+
 /* Checkbox */
 .ant-checkbox-inner {
   border: 1px solid #d9d9d9 !important;
@@ -347,6 +411,20 @@ html[dir='rtl'] .kiosk-exit-btn {
 
 .ant-table {
   background: transparent !important;
+}
+
+/* Compact visitor table — fit without horizontal scroll */
+.ant-table-thead > tr > th,
+.ant-table-tbody > tr > td {
+  padding: 8px 6px !important;
+  font-size: 12px !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ant-table-thead > tr > th {
+  font-size: 12px !important;
 }
 
 .ant-table-thead>tr>th {

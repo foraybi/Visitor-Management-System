@@ -1,5 +1,6 @@
 {
   "common": {
+    "appName": "Zuaar — Visitor Management",
     "enter": "Enter",
     "exit": "Exit",
     "submit": "Submit",
@@ -25,6 +26,8 @@
     "name": "Full Name",
     "namePlaceholder": "John Doe",
     "phone": "Phone Number",
+    "email": "Email Address",
+    "emailPlaceholder": "name@example.com",
     "nationalityType": "ID Type",
     "nationalityId": "ID Number",
     "country": "Country",
@@ -63,7 +66,8 @@
       "floorRequired": "Please select a floor",
       "selectType": "Please select an option",
       "employeeNotFound": "No matching employee. Check phone and employee number.",
-      "termsRequired": "You must agree to the terms and conditions"
+      "termsRequired": "You must agree to the terms and conditions",
+      "emailFormat": "Please enter a valid email address"
     }
   },
   "frontdesk": {
@@ -75,8 +79,24 @@
     "mostVisited": "Most Visited Floor",
     "exportPdf": "Export PDF",
     "exportExcel": "Export Excel",
+    "exportReportTitle": "Visitor Management Report",
+    "exportGenerated": "Generated",
+    "exportFilter": "Filter",
+    "exportSheetName": "Visitors",
     "filterByFloor": "Filter by Floor",
-    "allFloors": "All Floors"
+    "allFloors": "All Floors",
+    "filterByDate": "Filter by Date",
+    "today": "Today",
+    "allDates": "All Dates",
+    "dateRange": "Date Range",
+    "from": "From",
+    "to": "To",
+    "viewBy": "View by",
+    "day": "Day",
+    "week": "Week",
+    "month": "Month",
+    "year": "Year",
+    "all": "All"
   },
   "table": {
     "visitorId": "Visitor ID",
@@ -88,7 +108,11 @@
     "exitTime": "Exit Time",
     "actions": "Actions",
     "active": "Active",
-    "exited": "Exited"
+    "exited": "Exited",
+    "email": "Email",
+    "idNumber": "ID Number",
+    "companyName": "Company",
+    "timeSpent": "Time Spent"
   },
   "company": {
     "name": "Company Name",
@@ -118,7 +142,37 @@
     "floorNumber": "Floor Number",
     "floorName": "Floor Name",
     "floorImage": "Floor Image",
-    "analytics": "Analytics"
+    "analytics": "Analytics",
+    "documentSettings": "Document Settings",
+    "documentSettingsDescription": "Customize the header that appears on every exported PDF / Excel file. Logo, form name, and three label/value pairs.",
+    "documentAdmissionLabel": "Admission Label",
+    "documentAdmissionValue": "Admission Name",
+    "documentFormIdLabel": "Form ID / Version Label",
+    "documentFormIdValue": "Form ID / Version",
+    "documentVisionLabel": "Vision Number Label",
+    "documentVisionValue": "Vision Number",
+    "documentFormName": "Form Name",
+    "documentLogo": "Logo",
+    "uploadLogo": "Upload Logo",
+    "removeLogo": "Remove Logo",
+    "formEditor": "Form Editor",
+    "formEditorDescription": "Toggle visibility and reorder fields shown in the Visitor Enter form. Drag rows to reorder.",
+    "fieldVisible": "Visible",
+    "fieldHidden": "Hidden",
+    "resetToDefault": "Reset to Default",
+    "field": {
+      "visitorType": "Visitor Type",
+      "visitedCompanyId": "Visited Company",
+      "floor": "Floor",
+      "name": "Full Name",
+      "phone": "Phone Number",
+      "email": "Email",
+      "nationalityType": "ID Type",
+      "nationalityIdNumber": "ID Number",
+      "countryCode": "Country",
+      "signature": "Signature",
+      "terms": "Terms & Conditions"
+    }
   },
   "login": {
     "selectRole": "Select Your Role",

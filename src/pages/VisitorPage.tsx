@@ -122,8 +122,8 @@ export default function VisitorPage() {
           padding: 24,
         }}
       >
-        <Title style={{ color: 'rgb(0, 114, 151)', marginBottom: 32 }}>
-          VMS
+        <Title style={{ color: 'rgb(0, 114, 151)', marginBottom: 32, textAlign: 'center' }}>
+          {t('common.appName')}
         </Title>
         <Button
           type="primary"

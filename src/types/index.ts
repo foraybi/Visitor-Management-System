@@ -17,6 +17,7 @@ export interface Visitor {
   id: string;
   name: string;
   phone: string;
+  email?: string;
   nationalityType: NationalityType;
   nationalityIdNumber: string;
   countryCode: string;
@@ -59,6 +60,7 @@ export interface FrontDeskUser {
 export interface PersonalInfoFormData {
   name: string;
   phone: string;
+  email?: string;
   nationalityType: NationalityType;
   nationalityIdNumber: string;
   countryCode: string;
