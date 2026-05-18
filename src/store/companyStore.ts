@@ -5,7 +5,7 @@ import { generateId } from '../utils/idGenerator';
 
 export const useCompanyStore = create<CompanyState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       companies: [],
 
       addCompany: (data: Omit<Company, 'id'>) => {
@@ -74,6 +74,31 @@ export const useCompanyStore = create<CompanyState>()(
               : c
           ),
         }));
+      },
+
+      verifyEmployee: (companyId: string, employeeId: string) => {
+        set(state => ({
+          companies: state.companies.map(c =>
+            c.id === companyId
+              ? {
+                  ...c,
+                  employees: c.employees.map(e =>
+                    e.id === employeeId ? { ...e, verificationStatus: 'verified' } : e
+                  ),
+                }
+              : c
+          ),
+        }));
+      },
+
+      findEmployeeByIdNumber: (idNumber: string) => {
+        for (const c of get().companies) {
+          const employee = c.employees.find(
+            e => e.nationalityIdNumber === idNumber && e.employmentStatus === 'active'
+          );
+          if (employee) return { employee, companyId: c.id };
+        }
+        return null;
       },
 
       getFrontDeskUsers: () => {

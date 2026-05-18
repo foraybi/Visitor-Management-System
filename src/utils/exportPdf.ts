@@ -2,6 +2,18 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Visitor } from '../types';
 import { formatTimeFromISO, formatTimeSpent, getTodayDateString } from './timeUtils';
+import { azer29LTRegularBase64, azer29LTFontName } from '../assets/fonts/29LTAzer-Regular';
+
+/**
+ * Register the Azer Arabic font on a jsPDF instance.
+ * Adds the TTF to jsPDF's VFS once per document.
+ */
+function registerArabicFont(doc: jsPDF) {
+  const fileName = '29LTAzer-Regular.ttf';
+  doc.addFileToVFS(fileName, azer29LTRegularBase64);
+  doc.addFont(fileName, azer29LTFontName, 'normal');
+  doc.addFont(fileName, azer29LTFontName, 'bold');
+}
 
 export interface DocumentHeader {
   admissionLabel: string;
@@ -16,6 +28,7 @@ export interface DocumentHeader {
 
 export interface ExportOptions {
   companyLookup?: (id: string) => string;
+  floorLookup?: (n: number) => string;
   language?: 'en' | 'ar';
   /** Display label for the active date filter — included in the header */
   filterLabel?: string;
@@ -67,7 +80,7 @@ export function exportVisitorsPdf(
   visitors: Visitor[],
   options: ExportOptions = {}
 ): void {
-  const { companyLookup, language = 'en', filterLabel, documentHeader, labels } = options;
+  const { companyLookup, floorLookup, language = 'en', filterLabel, documentHeader, labels } = options;
   const L = { ...FALLBACK, ...labels };
   const isRTL = language === 'ar';
 
@@ -78,13 +91,20 @@ export function exportVisitorsPdf(
   const RIGHT = PAGE_W - MARGIN;
   let cursorY = 14;
 
+  // Register Arabic font when needed
+  if (isRTL) {
+    registerArabicFont(doc);
+  }
+  const FONT_NORMAL = isRTL ? azer29LTFontName : 'helvetica';
+  const FONT_BOLD = isRTL ? azer29LTFontName : 'helvetica';
+
   // ─── Document Header (admin-customised) ───
   if (documentHeader) {
     const labelValueAlign = isRTL ? 'right' : 'left';
     const xStart = isRTL ? RIGHT : LEFT;
 
     // Three label : value rows on the start side
-    doc.setFont('helvetica', 'normal', 'Amiri');
+    doc.setFont(FONT_NORMAL, 'normal');
     doc.setFontSize(10);
 
     const rows = [
@@ -100,7 +120,7 @@ export function exportVisitorsPdf(
     });
 
     // Form Name centered
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(FONT_BOLD, 'bold');
     doc.setFontSize(14);
     doc.text(documentHeader.formName || L.title, PAGE_W / 2, cursorY + 8, {
       align: 'center',
@@ -123,14 +143,14 @@ export function exportVisitorsPdf(
     cursorY += 6;
   } else {
     // Fallback to old single-line title
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(FONT_BOLD, 'bold');
     doc.setFontSize(16);
     doc.text(L.title, isRTL ? RIGHT : LEFT, cursorY, { align: isRTL ? 'right' : 'left' });
     cursorY += 8;
   }
 
   // Generated date + filter description
-  doc.setFont('helvetica', 'normal');
+  doc.setFont(FONT_NORMAL, 'normal');
   doc.setFontSize(9);
   doc.text(
     `${L.generated}: ${new Date().toLocaleString(language === 'ar' ? 'ar-SA' : 'en-SA')}`,
@@ -169,7 +189,7 @@ export function exportVisitorsPdf(
     v.email ?? '',
     v.countryName,
     v.nationalityIdNumber,
-    `${L.floor} ${v.floor}`,
+    floorLookup ? floorLookup(v.floor) : `${L.floor} ${v.floor}`,
     companyLookup ? companyLookup(v.visitedCompanyId) : v.visitedCompanyId,
     formatTimeFromISO(v.entryTime),
     formatTimeFromISO(v.exitTime),
@@ -180,8 +200,20 @@ export function exportVisitorsPdf(
     head: [columns],
     body: rows,
     startY: cursorY + 2,
-    styles: { fontSize: 7, halign: isRTL ? 'right' : 'left' },
-    headStyles: { fillColor: [0, 114, 151], halign: isRTL ? 'right' : 'left' },
+    styles: {
+      fontSize: 7,
+      halign: isRTL ? 'right' : 'left',
+      font: FONT_NORMAL,
+    },
+    headStyles: {
+      fillColor: [0, 114, 151],
+      halign: isRTL ? 'right' : 'left',
+      font: FONT_BOLD,
+      fontStyle: 'bold',
+    },
+    bodyStyles: {
+      font: FONT_NORMAL,
+    },
   });
 
   doc.save(`VMS-Export-${getTodayDateString()}.pdf`);

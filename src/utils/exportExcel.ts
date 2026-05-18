@@ -15,6 +15,7 @@ export interface ExcelDocumentHeader {
 
 export interface ExcelExportOptions {
   companyLookup?: (id: string) => string;
+  floorLookup?: (n: number) => string;
   language?: 'en' | 'ar';
   filterLabel?: string;
   documentHeader?: ExcelDocumentHeader;
@@ -61,7 +62,7 @@ export function exportVisitorsExcel(
   visitors: Visitor[],
   options: ExcelExportOptions = {}
 ): void {
-  const { companyLookup, language = 'en', filterLabel, documentHeader, labels } = options;
+  const { companyLookup, floorLookup, language = 'en', filterLabel, documentHeader, labels } = options;
   const L = { ...FALLBACK, ...labels };
 
   const rows = visitors.map(v => ({
@@ -72,7 +73,7 @@ export function exportVisitorsExcel(
     [L.email]: v.email ?? '',
     [L.nationality]: v.countryName,
     [L.idNumber]: v.nationalityIdNumber,
-    [L.floor]: `${L.floor} ${v.floor}`,
+    [L.floor]: floorLookup ? floorLookup(v.floor) : `${L.floor} ${v.floor}`,
     [L.company]: companyLookup ? companyLookup(v.visitedCompanyId) : v.visitedCompanyId,
     [L.timeIn]: formatTimeFromISO(v.entryTime),
     [L.timeOut]: formatTimeFromISO(v.exitTime),

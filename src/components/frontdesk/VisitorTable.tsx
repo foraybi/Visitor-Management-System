@@ -9,6 +9,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import { useVisitorStore } from '../../store/visitorStore';
 import { useCompanyStore } from '../../store/companyStore';
+import { useFloorStore } from '../../store/floorStore';
 import { useUIStore } from '../../store/uiStore';
 import { useDocumentSettingsStore } from '../../store/documentSettingsStore';
 import { formatTimeFromISO, formatTimeSpent } from '../../utils/timeUtils';
@@ -27,6 +28,7 @@ export default function VisitorTable() {
   const visitors = useVisitorStore(state => state.visitors);
   const exitVisitor = useVisitorStore(state => state.exitVisitor);
   const companies = useCompanyStore(state => state.companies);
+  const floors = useFloorStore(state => state.floors);
   const documentHeader = useDocumentSettingsStore(state => state.settings);
 
   const [selectedFloor, setSelectedFloor] = useState<Floor | 'all'>('all');
@@ -47,6 +49,30 @@ export default function VisitorTable() {
     const c = companies.find(x => x.id === id);
     if (!c) return id;
     return language === 'ar' ? c.nameAr : c.name;
+  };
+
+  const floorName = (num: number) => {
+    const f = floors.find(x => x.number === num);
+    if (!f) return `${t('visitor.floor')} ${num}`;
+    return language === 'ar' ? f.nameAr : f.name;
+  };
+
+  // For employee-type visitor records, prefer the employeeNumber over the auto VST id
+  const employeeIdLookup = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of companies) {
+      for (const e of c.employees) {
+        map.set(e.nationalityIdNumber, e.employeeNumber);
+      }
+    }
+    return map;
+  }, [companies]);
+
+  const displayId = (v: Visitor) => {
+    if (v.visitorType === 'employee') {
+      return employeeIdLookup.get(v.nationalityIdNumber) ?? v.id;
+    }
+    return v.id;
   };
 
   // Compute [from, to] window. Date Mode picks the anchor; Period widens it.
@@ -125,6 +151,7 @@ export default function VisitorTable() {
     exportVisitorsPdf(filteredVisitors, {
       language,
       companyLookup: companyName,
+      floorLookup: floorName,
       filterLabel,
       documentHeader,
       labels: {
@@ -153,6 +180,7 @@ export default function VisitorTable() {
     exportVisitorsExcel(filteredVisitors, {
       language,
       companyLookup: companyName,
+      floorLookup: floorName,
       filterLabel,
       documentHeader,
       labels: {
@@ -192,14 +220,24 @@ export default function VisitorTable() {
     });
   }, [dateFilteredVisitors, selectedFloor, searchTerm, companies, language]);
 
+  // Show the Date column only when the filter spans more than today
+  const showDateColumn = useMemo(() => {
+    if (dateMode === 'all') return true;
+    if (dateMode === 'range') return true;
+    if (dateMode === 'specific' && !singleDate.isSame(dayjs(), 'day')) return true;
+    if (periodMode === 'week' || periodMode === 'month' || periodMode === 'year') return true;
+    return false;
+  }, [dateMode, singleDate, periodMode]);
+
   const columns: ColumnsType<Visitor> = [
     {
       title: t('table.visitorId'),
-      dataIndex: 'id',
-      key: 'id',
-      width: 75,
-      render: id => (
-        <span style={{ fontWeight: 700, color: 'rgb(0, 114, 151)' }}>{id}</span>
+      key: 'displayId',
+      width: 85,
+      render: (_, record) => (
+        <span style={{ fontWeight: 700, color: 'rgb(0, 114, 151)' }}>
+          {displayId(record)}
+        </span>
       ),
     },
     {
@@ -270,8 +308,12 @@ export default function VisitorTable() {
       title: t('visitor.floor'),
       dataIndex: 'floor',
       key: 'floor',
-      width: 70,
-      render: floor => <Tag color="blue" style={{ margin: 0 }}>{floor}</Tag>,
+      width: 110,
+      render: (num: number) => (
+        <Tooltip title={floorName(num)}>
+          <Tag color="blue" style={{ margin: 0 }}>{floorName(num)}</Tag>
+        </Tooltip>
+      ),
     },
     {
       title: t('table.companyName'),
@@ -286,6 +328,17 @@ export default function VisitorTable() {
           </Tooltip>
         );
       },
+    },
+    {
+      title: t('employee.type'),
+      dataIndex: 'visitorType',
+      key: 'visitorType',
+      width: 90,
+      render: (vt: string) => (
+        <Tag color={vt === 'employee' ? 'purple' : 'geekblue'}>
+          {vt === 'employee' ? t('visitor.employee') : t('visitor.visitor')}
+        </Tag>
+      ),
     },
     {
       title: t('table.entryTime'),
@@ -311,6 +364,16 @@ export default function VisitorTable() {
         </span>
       ),
     },
+    ...(showDateColumn
+      ? [
+          {
+            title: t('table.date'),
+            dataIndex: 'date',
+            key: 'date',
+            width: 100,
+          } as const,
+        ]
+      : []),
     {
       title: t('table.actions'),
       key: 'actions',

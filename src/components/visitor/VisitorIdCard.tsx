@@ -80,6 +80,19 @@ export default function VisitorIdCard({ visitorId, onClose }: VisitorIdCardProps
           </Text>
         </div>
 
+        <Card
+          size="small"
+          style={{
+            marginBottom: 16,
+            background: 'rgba(0, 114, 151, 0.06)',
+            border: '1px solid rgba(0, 114, 151, 0.3)',
+          }}
+        >
+          <Text strong style={{ color: 'black', fontSize: 14 }}>
+            {t('visitor.exitInstructions')}
+          </Text>
+        </Card>
+
         <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
           Closing in {countdown} seconds...
         </Text>

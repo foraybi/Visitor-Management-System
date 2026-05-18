@@ -32,6 +32,7 @@ import { useUIStore } from '../../store/uiStore';
 import { useFormConfigStore } from '../../store/formConfigStore';
 import { countries } from '../../utils/countryData';
 import VisitorIdCard from './VisitorIdCard';
+import EmployeeWelcomeCard from './EmployeeWelcomeCard';
 import FloorGrid from './FloorGrid';
 import type { EnterFormData, NationalityType, VisitorType } from '../../types';
 
@@ -50,6 +51,10 @@ export default function EnterForm({ onClose }: EnterFormProps) {
   const [form] = Form.useForm();
   const sigCanvasRef = useRef<SignatureCanvas>(null);
   const [generatedId, setGeneratedId] = useState('');
+  const [employeeWelcome, setEmployeeWelcome] = useState<{
+    name: string;
+    number: string;
+  } | null>(null);
   const [nationalityType, setNationalityType] = useState<NationalityType | null>(null);
   const [visitorType, setVisitorType] = useState<VisitorType | null>(null);
   const [selectedFloor, setSelectedFloor] = useState<number | null>(null);
@@ -159,11 +164,15 @@ export default function EnterForm({ onClose }: EnterFormProps) {
   const idInputMode: 'numeric' | 'text' =
     nationalityType === 'passport' ? 'text' : 'numeric';
 
-  // Lookup employee by phone + employee number across all companies
-  const findEmployee = (phone: string, employeeNumber: string) => {
+  // Lookup employee primarily by ID number (national / iqama / passport).
+  // Phone & employee number are optional fast-path identifiers.
+  // Only active employees can check in.
+  const findEmployee = (idNumber: string) => {
     for (const c of companies) {
       const found = c.employees.find(
-        e => e.phone === phone && e.employeeNumber === employeeNumber
+        e =>
+          e.nationalityIdNumber === idNumber &&
+          e.employmentStatus === 'active'
       );
       if (found) return { employee: found, company: c };
     }
@@ -189,24 +198,33 @@ export default function EnterForm({ onClose }: EnterFormProps) {
     let data: EnterFormData;
 
     if (values.visitorType === 'employee') {
-      const match = findEmployee(values.phone, values.employeeNumber);
+      // Primary lookup: ID number (national/iqama/passport). Phone & emp# are optional.
+      const match = findEmployee(values.nationalityIdNumber);
       if (!match) {
-        message.error(t('visitor.validation.employeeNotFound'));
+        message.error(t('visitor.employeeNotInSystem'));
         return;
       }
       const signatureDataUrl = sigCanvasRef.current?.toDataURL() ?? '';
       data = {
         name: match.employee.name,
         phone: match.employee.phone,
-        email: values.email,
-        nationalityType: 'national_id',
-        nationalityIdNumber: match.employee.employeeNumber,
-        countryCode: 'SA',
+        email: match.employee.email,
+        nationalityType: match.employee.nationalityType,
+        nationalityIdNumber: match.employee.nationalityIdNumber,
+        countryCode: match.employee.countryCode,
         visitorType: 'employee',
-        visitedCompanyId: values.visitedCompanyId,
-        floor: selectedFloor,
+        visitedCompanyId: match.company.id,
+        floor: match.company.floor,
         signatureDataUrl,
       };
+      addVisitor(data);
+      sessionStorage.removeItem(DRAFT_KEY);
+      // Show personalised welcome — no visitor ID generated for employees
+      setEmployeeWelcome({
+        name: language === 'ar' ? match.employee.nameAr : match.employee.name,
+        number: match.employee.employeeNumber,
+      });
+      return;
     } else {
       const signatureDataUrl = sigCanvasRef.current?.toDataURL() ?? '';
       data = {
@@ -227,6 +245,16 @@ export default function EnterForm({ onClose }: EnterFormProps) {
     sessionStorage.removeItem(DRAFT_KEY);
     setGeneratedId(id);
   };
+
+  if (employeeWelcome) {
+    return (
+      <EmployeeWelcomeCard
+        employeeName={employeeWelcome.name}
+        employeeNumber={employeeWelcome.number}
+        onClose={onClose}
+      />
+    );
+  }
 
   if (generatedId) {
     return <VisitorIdCard visitorId={generatedId} onClose={onClose} />;
@@ -363,13 +391,14 @@ export default function EnterForm({ onClose }: EnterFormProps) {
           >
             {visitorType === 'employee' ? (
               <Row gutter={[16, 0]}>
-                <Col xs={24} md={12}>
+                <Col xs={24}>
                   <Form.Item
-                    label={t('visitor.employeePhone')}
-                    name="phone"
+                    label={t('visitor.employeeIdNumberLabel')}
+                    name="nationalityIdNumber"
                     rules={[
                       { required: true, message: t('common.required') },
-                      { pattern: /^05\d{8}$/, message: t('visitor.validation.phoneFormat') },
+                      { pattern: /^\d+$/, message: t('visitor.validation.nationalIdFormat') },
+                      { min: 4 },
                     ]}
                   >
                     <Input
@@ -377,31 +406,9 @@ export default function EnterForm({ onClose }: EnterFormProps) {
                       size="large"
                       type="tel"
                       inputMode="numeric"
-                      placeholder="0501234567"
-                      maxLength={10}
-                      onPressEnter={(e) => {
-                        e.preventDefault();
-                        empNumberRef.current?.focus();
-                      }}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={12}>
-                  <Form.Item
-                    label={t('visitor.employeeNumber')}
-                    name="employeeNumber"
-                    rules={[
-                      { required: true, message: t('common.required') },
-                      { pattern: /^\d{4}$/, message: 'Format: 4-digit number (e.g. 0001)' },
-                    ]}
-                  >
-                    <Input
-                      ref={empNumberRef}
-                      size="large"
-                      type="tel"
-                      inputMode="numeric"
-                      placeholder={t('visitor.employeeNumberPlaceholder')}
-                      maxLength={4}
+                      placeholder={t('visitor.employeeIdNumberPlaceholder')}
+                      maxLength={20}
+                      autoFocus
                       onKeyDown={(e) => {
                         if (
                           !/^[0-9]$/.test(e.key) &&
@@ -410,6 +417,35 @@ export default function EnterForm({ onClose }: EnterFormProps) {
                           e.preventDefault();
                         }
                       }}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label={t('visitor.employeePhoneOptional')}
+                    name="phone"
+                  >
+                    <Input
+                      size="large"
+                      type="tel"
+                      inputMode="numeric"
+                      placeholder="0501234567"
+                      maxLength={10}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label={t('visitor.employeeNumberOptional')}
+                    name="employeeNumber"
+                  >
+                    <Input
+                      ref={empNumberRef}
+                      size="large"
+                      type="tel"
+                      inputMode="numeric"
+                      placeholder={t('visitor.employeeNumberPlaceholder')}
+                      maxLength={4}
                     />
                   </Form.Item>
                 </Col>

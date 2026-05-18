@@ -32,12 +32,30 @@ export interface Visitor {
   date: string;
 }
 
+export type EmploymentStatus = 'active' | 'inactive';
+export type JobType = 'full_time' | 'part_time' | 'internship' | 'contract';
+export type VerificationStatus = 'verified' | 'pending';
+
 export interface Employee {
   id: string;
   employeeNumber: string;
   name: string;
+  nameAr: string;
   phone: string;
+  email?: string;
+  nationalityType: NationalityType;
+  nationalityIdNumber: string;
+  countryCode: string;
   gender: 'male' | 'female';
+  employmentStatus: EmploymentStatus;
+  jobType: JobType;
+  department?: string;
+  position?: string;
+  hireDate?: string;
+  photoDataUrl?: string;
+  notes?: string;
+  /** Admin-controlled verification flag. New employees added by frontdesk default to 'pending'. */
+  verificationStatus: VerificationStatus;
 }
 
 export interface Company {
@@ -97,6 +115,8 @@ export interface CompanyState {
   addEmployee: (companyId: string, employee: Omit<Employee, 'id'>) => void;
   updateEmployee: (companyId: string, employeeId: string, data: Partial<Employee>) => void;
   deleteEmployee: (companyId: string, employeeId: string) => void;
+  verifyEmployee: (companyId: string, employeeId: string) => void;
+  findEmployeeByIdNumber: (idNumber: string) => { employee: Employee; companyId: string } | null;
   getFrontDeskUsers: () => FrontDeskUser[];
   addFrontDeskUser: (user: Omit<FrontDeskUser, 'id'>) => void;
   removeFrontDeskUser: (id: string) => void;
