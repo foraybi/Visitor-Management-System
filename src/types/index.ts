@@ -125,8 +125,20 @@ export interface CompanyState {
 export interface AuthState {
   currentRole: UserRole | null;
   currentUserId: string | null;
-  login: (role: UserRole, userId?: string) => void;
-  logout: () => void;
+  currentEmail: string | null;
+  isLoading: boolean;
+  initialize: () => Promise<void>;
+  loginAsVisitor: () => void;
+  loginWithPassword: (email: string, password: string, role: 'frontdesk' | 'admin') => Promise<string | null>;
+  logout: () => Promise<void>;
+}
+
+export interface StaffProfile {
+  id: string;
+  email: string;
+  fullName: string | null;
+  role: 'admin' | 'frontdesk';
+  createdAt: string;
 }
 
 export interface UIState {

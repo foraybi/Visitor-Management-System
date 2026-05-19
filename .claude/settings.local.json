@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\csfo4\\\\Desktop\\\\Monshaat_Visitor_Managment_System_Project\\\\Visitor-Management-System\" -Force)",
+      "Bash(Select-Object -Property Name, PSIsContainer)",
+      "Bash(Get-Content package.json)",
+      "Bash(xargs grep -l 'database\\\\|sql\\\\|prisma\\\\|firebase\\\\|backend\\\\|server\\\\|http\\\\|fetch\\\\|axios')",
+      "Bash(npm install *)",
+      "PowerShell(Get-Command node, npm, pnpm, yarn -ErrorAction SilentlyContinue)",
+      "PowerShell(& \"C:\\\\Program Files\\\\nodejs\\\\npm.cmd\" install @supabase/supabase-js --prefix \"c:\\\\Users\\\\csfo4\\\\Desktop\\\\Monshaat_Visitor_Managment_System_Project\\\\Visitor-Management-System\")",
+      "PowerShell($nodePath = \\(Get-ChildItem \"C:\\\\Program Files\\\\nodejs\\\\node.exe\" -ErrorAction SilentlyContinue\\).FullName; if \\($nodePath\\) { $nodePath } else { \"not found at Program Files\" }; $nodePath2 = \\(Get-ChildItem \"$env:LOCALAPPDATA\\\\Programs\\\\nodejs\\\\node.exe\" -ErrorAction SilentlyContinue\\).FullName; if \\($nodePath2\\) { $nodePath2 } else { \"not found at LocalAppData\" })",
+      "PowerShell($node = \"C:\\\\Program Files\\\\nodejs\\\\node.exe\"; $tsc = \"c:\\\\Users\\\\csfo4\\\\Desktop\\\\Monshaat_Visitor_Managment_System_Project\\\\Visitor-Management-System\\\\node_modules\\\\.bin\\\\tsc.cmd\"; cd \"c:\\\\Users\\\\csfo4\\\\Desktop\\\\Monshaat_Visitor_Managment_System_Project\\\\Visitor-Management-System\"; & $tsc --noEmit 2>&1)",
+      "PowerShell($env:PATH = \"C:\\\\Program Files\\\\nodejs;\" + $env:PATH; node --version; & \"C:\\\\Program Files\\\\nodejs\\\\node.exe\" \"c:\\\\Users\\\\csfo4\\\\Desktop\\\\Monshaat_Visitor_Managment_System_Project\\\\Visitor-Management-System\\\\node_modules\\\\typescript\\\\bin\\\\tsc\" --noEmit --project \"c:\\\\Users\\\\csfo4\\\\Desktop\\\\Monshaat_Visitor_Managment_System_Project\\\\Visitor-Management-System\\\\tsconfig.app.json\" 2>&1)"
+    ]
+  }
+}

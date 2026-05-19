@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Card,
@@ -23,9 +24,12 @@ export default function DocumentSettingsTab() {
   const { t } = useTranslation();
   const settings = useDocumentSettingsStore(state => state.settings);
   const setSettings = useDocumentSettingsStore(state => state.setSettings);
+  const uploadLogo = useDocumentSettingsStore(state => state.uploadLogo);
+  const removeLogo = useDocumentSettingsStore(state => state.removeLogo);
   const reset = useDocumentSettingsStore(state => state.reset);
 
   const [form] = Form.useForm();
+  const [logoUploading, setLogoUploading] = useState(false);
 
   const onFinish = (values: any) => {
     setSettings(values);
@@ -35,12 +39,16 @@ export default function DocumentSettingsTab() {
   const uploadProps: UploadProps = {
     accept: 'image/*',
     showUploadList: false,
-    beforeUpload: (file) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setSettings({ logoDataUrl: e.target?.result as string });
-      };
-      reader.readAsDataURL(file);
+    beforeUpload: async (file) => {
+      setLogoUploading(true);
+      try {
+        await uploadLogo(file);
+        message.success('Logo uploaded');
+      } catch {
+        message.error('Failed to upload logo');
+      } finally {
+        setLogoUploading(false);
+      }
       return false;
     },
   };
@@ -111,9 +119,9 @@ export default function DocumentSettingsTab() {
             </Title>
           </Col>
           <Col xs={24} md={5} style={{ textAlign: 'center' }}>
-            {settings.logoDataUrl ? (
+            {settings.logoUrl ? (
               <AntImage
-                src={settings.logoDataUrl}
+                src={settings.logoUrl}
                 alt="logo"
                 height={80}
                 style={{ objectFit: 'contain', maxWidth: '100%' }}
@@ -188,13 +196,12 @@ export default function DocumentSettingsTab() {
             <Form.Item label={t('admin.documentLogo')}>
               <Space>
                 <Upload {...uploadProps}>
-                  <Button icon={<UploadOutlined />}>{t('admin.uploadLogo')}</Button>
+                  <Button icon={<UploadOutlined />} loading={logoUploading}>
+                    {t('admin.uploadLogo')}
+                  </Button>
                 </Upload>
-                {settings.logoDataUrl && (
-                  <Button
-                    danger
-                    onClick={() => setSettings({ logoDataUrl: '' })}
-                  >
+                {settings.logoUrl && (
+                  <Button danger onClick={removeLogo}>
                     {t('admin.removeLogo')}
                   </Button>
                 )}

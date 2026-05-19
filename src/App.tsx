@@ -5,12 +5,37 @@ import arEG from 'antd/locale/ar_EG';
 import './index.css';
 import AppRouter from './router/AppRouter';
 import { useUIStore } from './store/uiStore';
+import { useAuthStore } from './store/authStore';
+import { useVisitorStore } from './store/visitorStore';
+import { useCompanyStore } from './store/companyStore';
+import { useFloorStore } from './store/floorStore';
+import { useFormConfigStore } from './store/formConfigStore';
+import { useDocumentSettingsStore } from './store/documentSettingsStore';
 import { useSeedData } from './hooks/useSeedData';
 import './i18n';
 
 function App() {
   const { dir, language } = useUIStore();
+  const initialize = useAuthStore(s => s.initialize);
+  const fetchVisitors = useVisitorStore(s => s.fetchVisitors);
+  const subscribeToVisitors = useVisitorStore(s => s.subscribeToVisitors);
+  const fetchCompanies = useCompanyStore(s => s.fetchCompanies);
+  const fetchFloors = useFloorStore(s => s.fetchFloors);
+  const fetchFormConfig = useFormConfigStore(s => s.fetchFormConfig);
+  const fetchDocumentSettings = useDocumentSettingsStore(s => s.fetchDocumentSettings);
+
   useSeedData();
+
+  useEffect(() => {
+    initialize();
+    fetchVisitors();
+    fetchCompanies();
+    fetchFloors();
+    fetchFormConfig();
+    fetchDocumentSettings();
+    const unsubscribe = subscribeToVisitors();
+    return unsubscribe;
+  }, [initialize, fetchVisitors, subscribeToVisitors, fetchCompanies, fetchFloors, fetchFormConfig, fetchDocumentSettings]);
 
   useEffect(() => {
     document.documentElement.dir = dir;

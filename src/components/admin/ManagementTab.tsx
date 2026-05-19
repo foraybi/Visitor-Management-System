@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Card,
@@ -18,6 +18,8 @@ import {
   DatePicker,
   Upload,
   Image as AntImage,
+  Alert,
+  message,
 } from 'antd';
 import {
   PlusOutlined,
@@ -27,6 +29,7 @@ import {
   WomanOutlined,
   UploadOutlined,
   UserOutlined,
+  TeamOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { UploadProps } from 'antd';
@@ -38,7 +41,8 @@ import { useUIStore } from '../../store/uiStore';
 import { generateEmployeeNumber } from '../../utils/idGenerator';
 import { countries } from '../../utils/countryData';
 import { formatTimeFromISO } from '../../utils/timeUtils';
-import type { Company, Employee, NationalityType } from '../../types';
+import type { Company, Employee, NationalityType, StaffProfile } from '../../types';
+import { supabase, supabaseCreator, uploadFile } from '../../lib/supabase';
 
 const { Title } = Typography;
 
@@ -64,6 +68,8 @@ export default function ManagementTab() {
   const [editingEmployee, setEditingEmployee] = useState<{ employee: Employee; companyId: string } | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [photoDataUrl, setPhotoDataUrl] = useState<string>('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
   const [empNationalityType, setEmpNationalityType] = useState<NationalityType | null>(null);
   const [companyForm] = Form.useForm();
   const [employeeForm] = Form.useForm();
@@ -94,6 +100,7 @@ export default function ManagementTab() {
     setSelectedCompanyId(companyId);
     setEditingEmployee(null);
     setPhotoDataUrl('');
+    setPhotoFile(null);
     setEmpNationalityType(null);
     employeeForm.resetFields();
     const allNumbers = companies.flatMap(c => c.employees.map(e => e.employeeNumber));
@@ -110,6 +117,7 @@ export default function ManagementTab() {
     setEditingEmployee({ employee, companyId });
     setSelectedCompanyId(companyId);
     setPhotoDataUrl(employee.photoDataUrl ?? '');
+    setPhotoFile(null);
     setEmpNationalityType(employee.nationalityType);
     employeeForm.setFieldsValue({
       ...employee,
@@ -118,7 +126,20 @@ export default function ManagementTab() {
     setEmployeeModalOpen(true);
   };
 
-  const handleEmployeeSubmit = (values: any) => {
+  const handleEmployeeSubmit = async (values: any) => {
+    setPhotoUploading(true);
+    let resolvedPhotoUrl = photoDataUrl;
+    if (photoFile) {
+      try {
+        const ext = photoFile.name.split('.').pop() ?? 'jpg';
+        resolvedPhotoUrl = await uploadFile('employee-photos', `${crypto.randomUUID()}.${ext}`, photoFile);
+      } catch {
+        message.error('Failed to upload photo — employee saved without photo.');
+        resolvedPhotoUrl = '';
+      }
+    }
+    setPhotoUploading(false);
+
     const data: Omit<Employee, 'id'> = {
       employeeNumber: values.employeeNumber,
       name: values.name,
@@ -133,10 +154,9 @@ export default function ManagementTab() {
       jobType: values.jobType,
       department: values.department,
       position: values.position,
-      // Admin-added employees are auto-verified; edits preserve existing status
       verificationStatus: editingEmployee?.employee.verificationStatus ?? 'verified',
       hireDate: values.hireDate ? dayjs(values.hireDate).format('YYYY-MM-DD') : undefined,
-      photoDataUrl,
+      photoDataUrl: resolvedPhotoUrl,
       notes: values.notes,
     };
     if (editingEmployee) {
@@ -147,6 +167,7 @@ export default function ManagementTab() {
     setEmployeeModalOpen(false);
     employeeForm.resetFields();
     setPhotoDataUrl('');
+    setPhotoFile(null);
     setEditingEmployee(null);
   };
 
@@ -390,16 +411,122 @@ export default function ManagementTab() {
   ];
 
   // ─── Photo upload ───
+  const photoPreviewSrc = photoFile ? URL.createObjectURL(photoFile) : photoDataUrl;
+
   const photoUploadProps: UploadProps = {
     accept: 'image/*',
     showUploadList: false,
     beforeUpload: (file) => {
-      const reader = new FileReader();
-      reader.onload = (e) => setPhotoDataUrl(e.target?.result as string);
-      reader.readAsDataURL(file);
+      setPhotoFile(file);
       return false;
     },
   };
+
+  // ─── Staff accounts ───
+  const [staffList, setStaffList] = useState<StaffProfile[]>([]);
+  const [staffLoading, setStaffLoading] = useState(false);
+  const [staffModalOpen, setStaffModalOpen] = useState(false);
+  const [staffError, setStaffError] = useState('');
+  const [staffSubmitting, setStaffSubmitting] = useState(false);
+  const [staffForm] = Form.useForm();
+
+  const fetchStaff = useCallback(async () => {
+    setStaffLoading(true);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('role', 'frontdesk')
+      .order('created_at', { ascending: false });
+    setStaffLoading(false);
+    if (error) { console.error(error); return; }
+    setStaffList(
+      (data ?? []).map(r => ({
+        id: r.id,
+        email: r.email,
+        fullName: r.full_name ?? null,
+        role: r.role,
+        createdAt: r.created_at,
+      }))
+    );
+  }, []);
+
+  useEffect(() => { fetchStaff(); }, [fetchStaff]);
+
+  const handleCreateStaff = async (values: { email: string; password: string; fullName: string }) => {
+    setStaffSubmitting(true);
+    setStaffError('');
+    // Create the auth user with the secondary client (won't affect admin session)
+    const { data, error } = await supabaseCreator.auth.signUp({
+      email: values.email,
+      password: values.password,
+      options: { data: { role: 'frontdesk', full_name: values.fullName } },
+    });
+    if (error || !data.user) {
+      setStaffError(error?.message ?? 'Failed to create account.');
+      setStaffSubmitting(false);
+      return;
+    }
+    // Insert into profiles table so the admin can list/manage them
+    const { error: profileError } = await supabase.from('profiles').insert({
+      id: data.user.id,
+      email: values.email,
+      full_name: values.fullName || null,
+      role: 'frontdesk',
+    });
+    setStaffSubmitting(false);
+    if (profileError) {
+      setStaffError(profileError.message);
+      return;
+    }
+    message.success(`Front desk account created for ${values.email}`);
+    setStaffModalOpen(false);
+    staffForm.resetFields();
+    fetchStaff();
+  };
+
+  const handleDeleteStaff = async (id: string) => {
+    const { error } = await supabase.from('profiles').delete().eq('id', id);
+    if (error) { message.error('Failed to remove account.'); return; }
+    message.success('Account removed from front desk.');
+    setStaffList(prev => prev.filter(s => s.id !== id));
+  };
+
+  const staffColumns: ColumnsType<StaffProfile> = [
+    {
+      title: 'Name',
+      dataIndex: 'fullName',
+      key: 'fullName',
+      render: v => v ?? <span style={{ color: '#bfbfbf' }}>—</span>,
+    },
+    { title: 'Email', dataIndex: 'email', key: 'email' },
+    {
+      title: 'Role',
+      dataIndex: 'role',
+      key: 'role',
+      render: () => <Tag color="cyan">Front Desk</Tag>,
+    },
+    {
+      title: 'Created',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      render: v => new Date(v).toLocaleDateString(),
+    },
+    {
+      title: t('table.actions'),
+      key: 'actions',
+      render: (_, record) => (
+        <Popconfirm
+          title="Remove this front desk account?"
+          description="The user will no longer appear here but their login may still work until removed from Supabase Auth."
+          onConfirm={() => handleDeleteStaff(record.id)}
+          okText="Remove"
+          okButtonProps={{ danger: true }}
+        >
+          <Button size="small" danger icon={<DeleteOutlined />} />
+        </Popconfirm>
+      ),
+    },
+  ];
 
   // ─── ID validation by type ───
   const idPlaceholder =
@@ -454,6 +581,33 @@ export default function ManagementTab() {
               </Card>
             ),
           },
+          {
+            key: 'staff',
+            label: (
+              <span>
+                <TeamOutlined style={{ marginInlineEnd: 6 }} />
+                Staff Accounts
+              </span>
+            ),
+            children: (
+              <Card
+                title={<Title level={4} style={{ margin: 0 }}>Front Desk Accounts</Title>}
+                extra={
+                  <Button type="primary" icon={<PlusOutlined />} onClick={() => { setStaffModalOpen(true); setStaffError(''); }}>
+                    Add Front Desk User
+                  </Button>
+                }
+              >
+                <Table
+                  columns={staffColumns}
+                  dataSource={staffList}
+                  rowKey="id"
+                  loading={staffLoading}
+                  pagination={{ pageSize: 10 }}
+                />
+              </Card>
+            ),
+          },
         ]}
       />
 
@@ -494,6 +648,60 @@ export default function ManagementTab() {
         </Form>
       </Modal>
 
+      {/* Staff Account Modal */}
+      <Modal
+        open={staffModalOpen}
+        title="Create Front Desk Account"
+        onCancel={() => { setStaffModalOpen(false); staffForm.resetFields(); setStaffError(''); }}
+        footer={null}
+        centered
+        destroyOnClose
+        width={460}
+      >
+        {staffError && (
+          <Alert message={staffError} type="error" showIcon style={{ marginBottom: 16 }} />
+        )}
+        <Form
+          form={staffForm}
+          layout="vertical"
+          onFinish={handleCreateStaff}
+          requiredMark={false}
+          style={{ marginTop: 16 }}
+        >
+          <Form.Item
+            label="Full Name"
+            name="fullName"
+            rules={[{ required: true, message: 'Enter the staff member\'s name' }]}
+          >
+            <Input size="large" placeholder="Ahmed Al-Rashidi" />
+          </Form.Item>
+          <Form.Item
+            label="Email"
+            name="email"
+            rules={[{ required: true, type: 'email', message: 'Enter a valid email' }]}
+          >
+            <Input size="large" type="email" placeholder="staff@company.com" />
+          </Form.Item>
+          <Form.Item
+            label="Password"
+            name="password"
+            rules={[{ required: true, min: 8, message: 'Password must be at least 8 characters' }]}
+          >
+            <Input.Password size="large" placeholder="Min. 8 characters" />
+          </Form.Item>
+          <Form.Item style={{ marginBottom: 0 }}>
+            <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+              <Button onClick={() => { setStaffModalOpen(false); staffForm.resetFields(); }}>
+                {t('common.cancel')}
+              </Button>
+              <Button type="primary" htmlType="submit" loading={staffSubmitting}>
+                Create Account
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+
       {/* Employee Modal */}
       <Modal
         open={employeeModalOpen}
@@ -502,6 +710,7 @@ export default function ManagementTab() {
           setEmployeeModalOpen(false);
           setEditingEmployee(null);
           setPhotoDataUrl('');
+          setPhotoFile(null);
         }}
         footer={null}
         centered
@@ -642,8 +851,8 @@ export default function ManagementTab() {
             <Col xs={24} md={12}>
               <Form.Item label={t('employee.photo')}>
                 <Space direction="vertical" style={{ width: '100%' }}>
-                  {photoDataUrl ? (
-                    <AntImage src={photoDataUrl} alt="" width={80} height={80} style={{ objectFit: 'cover', borderRadius: 8 }} />
+                  {photoPreviewSrc ? (
+                    <AntImage src={photoPreviewSrc} alt="" width={80} height={80} style={{ objectFit: 'cover', borderRadius: 8 }} />
                   ) : (
                     <div style={{ width: 80, height: 80, borderRadius: 8, background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <UserOutlined style={{ fontSize: 32, color: '#bfbfbf' }} />
@@ -653,7 +862,11 @@ export default function ManagementTab() {
                     <Upload {...photoUploadProps}>
                       <Button icon={<UploadOutlined />}>{t('admin.uploadLogo')}</Button>
                     </Upload>
-                    {photoDataUrl && <Button danger onClick={() => setPhotoDataUrl('')}>{t('common.delete')}</Button>}
+                    {photoPreviewSrc && (
+                      <Button danger onClick={() => { setPhotoDataUrl(''); setPhotoFile(null); }}>
+                        {t('common.delete')}
+                      </Button>
+                    )}
                   </Space>
                 </Space>
               </Form.Item>
@@ -668,7 +881,7 @@ export default function ManagementTab() {
           <Form.Item style={{ marginBottom: 0 }}>
             <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
               <Button onClick={() => setEmployeeModalOpen(false)}>{t('common.cancel')}</Button>
-              <Button type="primary" htmlType="submit">{t('common.save')}</Button>
+              <Button type="primary" htmlType="submit" loading={photoUploading}>{t('common.save')}</Button>
             </Space>
           </Form.Item>
         </Form>
