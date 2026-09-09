@@ -32,9 +32,17 @@ export interface DirectoryFloor {
   imageUrl: string;
 }
 
+/** Which check-in fields are shown. Null means show them all. */
+export interface DirectoryFormField {
+  key: string;
+  visible: boolean;
+  order?: number;
+}
+
 export interface Directory {
   companies: DirectoryCompany[];
   floors: DirectoryFloor[];
+  formFields: DirectoryFormField[] | null;
 }
 
 export interface EmployeeMatch {

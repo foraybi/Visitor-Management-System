@@ -60,7 +60,6 @@
     "termsContent": "By entering, you agree to follow building rules, present a valid ID upon request, and abide by visitor conduct policies. Your information may be used for security and emergency purposes.",
     "kioskStart": "Tap to begin",
     "kioskResume": "Tap to resume",
-    "draftRestored": "Your previous form has been restored",
     "validation": {
       "nameMin": "Name must be at least 2 characters",
       "phoneFormat": "Phone must start with 05 and be 10 digits",
@@ -75,7 +74,27 @@
       "selectType": "Please select an option",
       "employeeNotFound": "No matching employee. Check phone and employee number.",
       "termsRequired": "You must agree to the terms and conditions",
-      "emailFormat": "Please enter a valid email address"
+      "emailFormat": "Please enter a valid email address",
+      "visitCodeFormat": "Enter your 4-digit visitor number, for example 0001"
+    },
+    "thankYou": "Thank you for visiting",
+    "noFloors": "No floors configured",
+    "visitorIdLabel": "Visitor ID",
+    "closingIn": "Closing in {{count}} seconds...",
+    "checkInHeading": "Visitor check-in",
+    "identity": {
+      "national_id": "National ID",
+      "iqama": "Iqama",
+      "passport": "Passport"
+    },
+    "errors": {
+      "offline": "No connection. Your check-in was not recorded. Please try again.",
+      "unauthorised_device": "This tablet is not registered. Please tell the front desk.",
+      "rate_limited": "Too many attempts. Please wait a moment and try again.",
+      "invalid_identity": "That ID number does not look right. Please check it.",
+      "unknown_company": "That company is no longer listed. Please choose another.",
+      "no_active_visit": "No open visit found for that number.",
+      "server_error": "Something went wrong. Your check-in was not recorded."
     }
   },
   "frontdesk": {
@@ -219,6 +238,11 @@
     "username": "Username",
     "password": "Password",
     "login": "Login",
-    "invalidCredentials": "Invalid username or password"
+    "invalidCredentials": "Invalid username or password",
+    "staffSignIn": "Staff sign in",
+    "staffSignInHint": "Use the account your administrator set up for you.",
+    "email": "Email",
+    "emailInvalid": "Enter a valid email address",
+    "signIn": "Sign in"
   }
 }

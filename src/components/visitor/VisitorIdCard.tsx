@@ -52,7 +52,7 @@ export default function VisitorIdCard({ visitorId, onClose }: VisitorIdCardProps
           styles={{ body: { padding: 32 } }}
         >
           <Text style={{ color: '#000000', fontSize: 14 }}>
-            Visitor ID
+            {t('visitor.visitorIdLabel')}
           </Text>
           <Title
             level={1}
@@ -94,7 +94,7 @@ export default function VisitorIdCard({ visitorId, onClose }: VisitorIdCardProps
         </Card>
 
         <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-          Closing in {countdown} seconds...
+          {t('visitor.closingIn', { count: countdown })}
         </Text>
 
         <Button type="primary" size="large" block onClick={onClose}>

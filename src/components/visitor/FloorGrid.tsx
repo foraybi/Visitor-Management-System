@@ -2,12 +2,24 @@ import { useTranslation } from 'react-i18next';
 import { Row, Col, Card, Empty } from 'antd';
 import { BuildOutlined } from '@ant-design/icons';
 import { useUIStore } from '../../store/uiStore';
-import type { FloorInfo } from '../../types';
+
+
+/**
+ * The floor fields this grid renders. Narrower than the stored record on
+ * purpose: the kiosk receives only these, and widening the prop would drag the
+ * database row shape onto the tablet.
+ */
+export interface FloorOption {
+  number: number;
+  name: string;
+  nameAr: string;
+  imageUrl: string;
+}
 
 interface FloorGridProps {
   value: number | null;
   onChange: (floor: number) => void;
-  floors: FloorInfo[];
+  floors: FloorOption[];
 }
 
 export default function FloorGrid({ value, onChange, floors }: FloorGridProps) {
@@ -15,7 +27,7 @@ export default function FloorGrid({ value, onChange, floors }: FloorGridProps) {
   const { language } = useUIStore();
 
   if (floors.length === 0) {
-    return <Empty description="No floors configured" />;
+    return <Empty description={t('visitor.noFloors')} />;
   }
 
   // Sort by floor number
@@ -26,7 +38,7 @@ export default function FloorGrid({ value, onChange, floors }: FloorGridProps) {
   return (
     <Row gutter={[16, 16]}>
       {sortedFloors.map(floor => (
-        <Col xs={24} sm={12} md={colSpan} key={floor.id}>
+        <Col xs={24} sm={12} md={colSpan} key={floor.number}>
           <Card
             hoverable
             onClick={() => onChange(floor.number)}

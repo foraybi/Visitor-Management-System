@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, Table, Input, Select, Tag, Button, Row, Col, DatePicker, Tooltip, Space } from 'antd';
 import { SearchOutlined, LogoutOutlined, FilePdfOutlined, FileExcelOutlined } from '@ant-design/icons';
-import { exportVisitorsPdf } from '../../utils/exportPdf';
-import { exportVisitorsExcel } from '../../utils/exportExcel';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { type Dayjs } from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
@@ -161,8 +159,9 @@ export default function VisitorTable() {
     return `${from} → ${to}`;
   }, [dateMode, dateWindow, t]);
 
-  const handleExportPdf = () => {
-    exportVisitorsPdf(filteredVisitors, {
+  const handleExportPdf = async () => {
+    const { exportVisitorsPdf } = await import('../../utils/exportPdf');
+    await exportVisitorsPdf(filteredVisitors, {
       language,
       companyLookup: companyName,
       floorLookup: floorName,
@@ -190,7 +189,8 @@ export default function VisitorTable() {
     });
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    const { exportVisitorsExcel } = await import('../../utils/exportExcel');
     exportVisitorsExcel(filteredVisitors, {
       language,
       companyLookup: companyName,

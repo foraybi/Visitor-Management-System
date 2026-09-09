@@ -2,17 +2,51 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Visitor } from '../types';
 import { formatTimeFromISO, formatTimeSpent, getTodayDateString } from './timeUtils';
-import { azer29LTRegularBase64, azer29LTFontName } from '../assets/fonts/29LTAzer-Regular';
+export const azer29LTFontName = 'Azer29LT';
+
+const FONT_FILE = '29LTAzer-Regular.ttf';
+const FONT_URL = `/fonts/${FONT_FILE}`;
 
 /**
- * Register the Azer Arabic font on a jsPDF instance.
- * Adds the TTF to jsPDF's VFS once per document.
+ * The Arabic font, base64 encoded for jsPDF, fetched on first export.
+ *
+ * It used to be a 500 KB base64 string imported at module scope, so every
+ * visitor at the kiosk downloaded the font that only the front desk's PDF
+ * export needs. The base64 form is also a third larger than the binary, and
+ * both sat in the repository.
+ *
+ * Cached in a module-level promise so a second export reuses the first fetch.
  */
-function registerArabicFont(doc: jsPDF) {
-  const fileName = '29LTAzer-Regular.ttf';
-  doc.addFileToVFS(fileName, azer29LTRegularBase64);
-  doc.addFont(fileName, azer29LTFontName, 'normal');
-  doc.addFont(fileName, azer29LTFontName, 'bold');
+let fontPromise: Promise<string> | null = null;
+
+async function loadArabicFontBase64(): Promise<string> {
+  fontPromise ??= (async () => {
+    const response = await fetch(FONT_URL);
+    if (!response.ok) throw new Error(`Could not load ${FONT_FILE}: ${response.status}`);
+
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    // Chunked so a 375 KB font does not blow the argument limit of fromCharCode.
+    let binary = '';
+    const CHUNK = 0x8000;
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+    }
+    return btoa(binary);
+  })().catch((cause) => {
+    // Do not cache a failure; the next export should try again.
+    fontPromise = null;
+    throw cause;
+  });
+
+  return fontPromise;
+}
+
+/** Register the Azer Arabic font on a jsPDF instance. */
+async function registerArabicFont(doc: jsPDF) {
+  const base64 = await loadArabicFontBase64();
+  doc.addFileToVFS(FONT_FILE, base64);
+  doc.addFont(FONT_FILE, azer29LTFontName, 'normal');
+  doc.addFont(FONT_FILE, azer29LTFontName, 'bold');
 }
 
 export interface DocumentHeader {
@@ -76,10 +110,10 @@ const FALLBACK: Required<ExportOptions>['labels'] = {
   exited: 'Exited',
 };
 
-export function exportVisitorsPdf(
+export async function exportVisitorsPdf(
   visitors: Visitor[],
   options: ExportOptions = {}
-): void {
+): Promise<void> {
   const { companyLookup, floorLookup, language = 'en', filterLabel, documentHeader, labels } = options;
   const L = { ...FALLBACK, ...labels };
   const isRTL = language === 'ar';
@@ -91,9 +125,10 @@ export function exportVisitorsPdf(
   const RIGHT = PAGE_W - MARGIN;
   let cursorY = 14;
 
-  // Register Arabic font when needed
+  // Register the Arabic font when needed. Awaited because it is fetched rather
+  // than bundled, so the first Arabic export waits on one request.
   if (isRTL) {
-    registerArabicFont(doc);
+    await registerArabicFont(doc);
   }
   const FONT_NORMAL = isRTL ? azer29LTFontName : 'helvetica';
   const FONT_BOLD = isRTL ? azer29LTFontName : 'helvetica';

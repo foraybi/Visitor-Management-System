@@ -12,9 +12,12 @@ import { json, kioskHandler, serviceClient } from '../_lib/kiosk';
 export default kioskHandler('GET', async (_req: VercelRequest, res: VercelResponse) => {
   const supabase = serviceClient();
 
-  const [companies, floors] = await Promise.all([
+  // Fetched together rather than in sequence: three independent reads on the
+  // critical path of the tablet's first paint.
+  const [companies, floors, formConfig] = await Promise.all([
     supabase.from('companies').select('id, name, name_ar, floor').order('name'),
     supabase.from('floors').select('number, name, name_ar, image_url').order('number'),
+    supabase.from('form_config').select('fields').eq('id', 1).maybeSingle(),
   ]);
 
   if (companies.error || floors.error) {
@@ -36,5 +39,9 @@ export default kioskHandler('GET', async (_req: VercelRequest, res: VercelRespon
       nameAr: f.name_ar,
       imageUrl: f.image_url,
     })),
+    // Which fields the check-in form shows. The kiosk cannot read form_config
+    // directly, and a missing row means every field is shown, which is what the
+    // form defaulted to before.
+    formFields: formConfig.data?.fields ?? null,
   });
 });

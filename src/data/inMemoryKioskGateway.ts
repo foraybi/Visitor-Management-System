@@ -85,7 +85,7 @@ export function inMemoryKioskGateway(options: InMemoryOptions = {}): InMemoryKio
     },
 
     async directory() {
-      return guard<Directory>() ?? { ok: true, value: { companies, floors } };
+      return guard<Directory>() ?? { ok: true, value: { companies, floors, formFields: null } };
     },
 
     async lookupEmployee(idType, idNumber) {

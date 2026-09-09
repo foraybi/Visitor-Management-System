@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Form, Input, Button, Result, Space, message } from 'antd';
 import { CheckCircleOutlined } from '@ant-design/icons';
-import { useVisitorStore } from '../../store/visitorStore';
+import { kioskErrorKey, useKioskStore } from '../../app/kiosk/kioskStore';
 
 interface ExitModalProps {
   onClose: () => void;
@@ -10,25 +10,33 @@ interface ExitModalProps {
 
 export default function ExitModal({ onClose }: ExitModalProps) {
   const { t } = useTranslation();
-  const { exitVisitor } = useVisitorStore();
+  const checkOut = useKioskStore(s => s.checkOut);
+  const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [form] = Form.useForm();
 
-  const handleSubmit = (values: { visitorId: string }) => {
+  const handleSubmit = async (values: { visitorId: string }) => {
     const normalizedId = values.visitorId.trim().padStart(4, '0');
     if (!/^\d{4}$/.test(normalizedId)) {
-      message.error('Invalid format. Use a 4-digit number (e.g. 0001)');
+      message.error(t('visitor.validation.visitCodeFormat'));
       return;
     }
-    const result = exitVisitor(normalizedId);
-    if (result) {
+
+    setSubmitting(true);
+    const result = await checkOut(normalizedId);
+    setSubmitting(false);
+
+    if (result.ok) {
       setSuccess(true);
-      setTimeout(() => {
-        onClose();
-      }, 2500);
-    } else {
-      message.error(t('visitor.exitError'));
+      setTimeout(onClose, 2500);
+      return;
     }
+
+    // Every failure is shown. A dropped network used to look identical to
+    // success here, because the update was fired and its error swallowed.
+    message.error(
+      result.error === 'no_active_visit' ? t('visitor.exitError') : t(kioskErrorKey(result.error)),
+    );
   };
 
   if (success) {
@@ -41,7 +49,7 @@ export default function ExitModal({ onClose }: ExitModalProps) {
             />
           }
           title={t('visitor.exitSuccess')}
-          subTitle="Thank you for visiting"
+          subTitle={t('visitor.thankYou')}
         />
       </Modal>
     );
@@ -68,10 +76,10 @@ export default function ExitModal({ onClose }: ExitModalProps) {
           label={t('visitor.visitorIdPlaceholder')}
           name="visitorId"
           rules={[
-            { required: true, message: 'Please enter your visitor ID' },
+            { required: true, message: t('common.required') },
             {
               pattern: /^\d{1,4}$/,
-              message: 'Format: 4-digit number (e.g. 0001)',
+              message: t('visitor.validation.visitCodeFormat'),
             },
           ]}
         >
@@ -95,10 +103,10 @@ export default function ExitModal({ onClose }: ExitModalProps) {
 
         <Form.Item style={{ marginBottom: 0, marginTop: 24 }}>
           <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
-            <Button size="large" onClick={onClose}>
+            <Button size="large" onClick={onClose} disabled={submitting}>
               {t('common.cancel')}
             </Button>
-            <Button type="primary" size="large" htmlType="submit">
+            <Button type="primary" size="large" htmlType="submit" loading={submitting}>
               {t('common.submit')}
             </Button>
           </Space>

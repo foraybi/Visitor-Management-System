@@ -2,8 +2,6 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Typography } from 'antd';
 import { LoginOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
 import MainScreen from '../components/visitor/MainScreen';
 
 const { Title } = Typography;
@@ -18,8 +16,6 @@ const EXIT_HOLD_MS = 5000;
 
 export default function VisitorPage() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const { logout } = useAuthStore();
   const [kioskActive, setKioskActive] = useState(false);
   const [showResumeOverlay, setShowResumeOverlay] = useState(false);
   const [holdProgress, setHoldProgress] = useState(0);
@@ -46,10 +42,12 @@ export default function VisitorPage() {
     } catch {
       // ignore
     }
+    // Leaving kiosk mode returns to the tablet's own welcome screen. It used to
+    // sign out and navigate to "/", which in the single-app build rendered the
+    // front desk and admin login cards. This build has no such screen and no
+    // router to reach one.
     setKioskActive(false);
-    logout();
-    navigate('/');
-  }, [logout, navigate]);
+  }, []);
 
   const clearHold = useCallback(() => {
     if (holdTimerRef.current !== null) {

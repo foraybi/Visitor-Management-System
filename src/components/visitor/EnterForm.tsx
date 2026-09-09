@@ -25,16 +25,18 @@ import {
 } from '@ant-design/icons';
 import type { InputRef, RefSelectProps } from 'antd';
 import SignatureCanvas from 'react-signature-canvas';
-import { useVisitorStore } from '../../store/visitorStore';
-import { useCompanyStore } from '../../store/companyStore';
-import { useFloorStore } from '../../store/floorStore';
 import { useUIStore } from '../../store/uiStore';
-import { useFormConfigStore } from '../../store/formConfigStore';
+import {
+  kioskErrorKey,
+  useKioskFieldVisible,
+  useKioskStore,
+} from '../../app/kiosk/kioskStore';
+import { identityLabelKey } from '../../domain/identity/identity';
 import { countries } from '../../utils/countryData';
 import VisitorIdCard from './VisitorIdCard';
 import EmployeeWelcomeCard from './EmployeeWelcomeCard';
 import FloorGrid from './FloorGrid';
-import type { EnterFormData, NationalityType, VisitorType } from '../../types';
+import type { NationalityType, VisitorType } from '../../types';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -79,12 +81,16 @@ export default function EnterForm({ onClose }: EnterFormProps) {
   const [visitorType, setVisitorType] = useState<VisitorType | null>(null);
   const [selectedFloor, setSelectedFloor] = useState<number | null>(null);
   const [termsModalOpen, setTermsModalOpen] = useState(false);
-  const { addVisitor } = useVisitorStore();
-  const { companies } = useCompanyStore();
-  const { floors } = useFloorStore();
-  const formFields = useFormConfigStore(state => state.fields);
-  const isFieldVisible = (key: string) =>
-    formFields.find(f => f.key === key)?.visible ?? true;
+  // The tablet holds no database credentials. Everything it needs comes from
+  // /api/kiosk/*, which returns a company picker and nothing else. The previous
+  // version loaded every employee record onto the device so it could scan them
+  // in memory.
+  const companies = useKioskStore(s => s.companies);
+  const floors = useKioskStore(s => s.floors);
+  const checkIn = useKioskStore(s => s.checkIn);
+  const lookupEmployee = useKioskStore(s => s.lookupEmployee);
+  const isFieldVisible = useKioskFieldVisible();
+  const [submitting, setSubmitting] = useState(false);
 
   // Refs for keyboard navigation
   const companyRef = useRef<RefSelectProps>(null);
@@ -103,9 +109,9 @@ export default function EnterForm({ onClose }: EnterFormProps) {
   // instead.
 
   const nationalityLabels: Record<NationalityType, string> = {
-    national_id: language === 'ar' ? 'الهوية الوطنية' : 'National ID',
-    iqama: language === 'ar' ? 'الإقامة' : 'Iqama',
-    passport: language === 'ar' ? 'جواز السفر' : 'Passport',
+    national_id: t(identityLabelKey('national_id')),
+    iqama: t(identityLabelKey('iqama')),
+    passport: t(identityLabelKey('passport')),
   };
 
   const countryOptions = countries.map(c => ({
@@ -159,67 +165,79 @@ export default function EnterForm({ onClose }: EnterFormProps) {
   const idInputMode: 'numeric' | 'text' =
     nationalityType === 'passport' ? 'text' : 'numeric';
 
-  // Lookup employee primarily by ID number (national / iqama / passport).
-  // Phone & employee number are optional fast-path identifiers.
-  // Only active employees can check in.
-  const findEmployee = (idNumber: string) => {
-    for (const c of companies) {
-      const found = c.employees.find(
-        e =>
-          e.nationalityIdNumber === idNumber &&
-          e.employmentStatus === 'active'
-      );
-      if (found) return { employee: found, company: c };
-    }
-    return null;
-  };
-
-  const onSubmit = (values: CheckInFormValues) => {
+  /**
+   * Submit the check-in.
+   *
+   * Everything below the validation goes through the kiosk gateway, which
+   * returns a result rather than throwing. A failed check-in therefore has no
+   * visit code to render, so the visitor cannot be handed an id card for a
+   * record that was never written. That is exactly what used to happen: the
+   * insert was fired, its error logged to a console nobody was watching, and the
+   * card shown regardless.
+   */
+  const onSubmit = async (values: CheckInFormValues) => {
     if (!selectedFloor) {
       message.error(t('visitor.validation.floorRequired'));
       return;
     }
-    if (isFieldVisible('signature')) {
-      if (!sigCanvasRef.current || sigCanvasRef.current.isEmpty()) {
-        message.error(t('visitor.validation.signatureRequired'));
-        return;
-      }
+    if (isFieldVisible('signature') && (!sigCanvasRef.current || sigCanvasRef.current.isEmpty())) {
+      message.error(t('visitor.validation.signatureRequired'));
+      return;
     }
     if (!values.agreedToTerms) {
       message.error(t('visitor.validation.termsRequired'));
       return;
     }
 
-    let data: EnterFormData;
+    const signatureDataUrl = sigCanvasRef.current?.toDataURL() ?? '';
+    setSubmitting(true);
 
-    if (values.visitorType === 'employee') {
-      // Primary lookup: ID number (national/iqama/passport). Phone & emp# are optional.
-      const match = findEmployee(values.nationalityIdNumber);
-      if (!match) {
-        message.error(t('visitor.employeeNotInSystem'));
+    try {
+      if (values.visitorType === 'employee') {
+        // The tablet no longer holds the employee directory, so recognition
+        // happens server-side and returns one display name.
+        const found = await lookupEmployee(values.nationalityType, values.nationalityIdNumber);
+        if (!found.ok) {
+          message.error(t(kioskErrorKey(found.error)));
+          return;
+        }
+        if (!found.value?.company) {
+          message.error(t('visitor.employeeNotInSystem'));
+          return;
+        }
+
+        const employee = found.value;
+        const { company } = employee;
+        if (!company) {
+          message.error(t('visitor.employeeNotInSystem'));
+          return;
+        }
+
+        const result = await checkIn({
+          visitorType: 'employee',
+          name: employee.name,
+          phone: '',
+          nationalityType: values.nationalityType,
+          nationalityIdNumber: values.nationalityIdNumber,
+          countryCode: 'SA',
+          countryName: '',
+          visitedCompanyId: company.id,
+          floor: company.floor,
+          signatureDataUrl,
+        });
+
+        if (!result.ok) {
+          message.error(t(kioskErrorKey(result.error)));
+          return;
+        }
+
+        setEmployeeWelcome({
+          name: language === 'ar' ? employee.nameAr : employee.name,
+          number: employee.employeeNumber,
+        });
         return;
       }
-      const signatureDataUrl = sigCanvasRef.current?.toDataURL() ?? '';
-      data = {
-        name: match.employee.name,
-        phone: match.employee.phone,
-        email: match.employee.email,
-        nationalityType: match.employee.nationalityType,
-        nationalityIdNumber: match.employee.nationalityIdNumber,
-        countryCode: match.employee.countryCode,
-        visitorType: 'employee',
-        visitedCompanyId: match.company.id,
-        floor: match.company.floor,
-        signatureDataUrl,
-      };
-      addVisitor(data);
-      // Show personalised welcome — no visitor ID generated for employees
-      setEmployeeWelcome({
-        name: language === 'ar' ? match.employee.nameAr : match.employee.name,
-        number: match.employee.employeeNumber,
-      });
-      return;
-    } else {
+
       // The form marks these required, but the values object cannot express
       // "required only on this branch". Check rather than defaulting, so a
       // validation gap surfaces as a message instead of an empty name in the
@@ -230,23 +248,31 @@ export default function EnterForm({ onClose }: EnterFormProps) {
         return;
       }
 
-      const signatureDataUrl = sigCanvasRef.current?.toDataURL() ?? '';
-      data = {
+      const country = countries.find(c => c.value === countryCode);
+
+      const result = await checkIn({
+        visitorType: 'visitor',
         name,
         phone,
         email: values.email,
         nationalityType: values.nationalityType,
         nationalityIdNumber: values.nationalityIdNumber,
         countryCode,
-        visitorType: 'visitor',
+        countryName: country ? country.label : '',
         visitedCompanyId: values.visitedCompanyId,
         floor: selectedFloor,
         signatureDataUrl,
-      };
-    }
+      });
 
-    const id = addVisitor(data);
-    setGeneratedId(id);
+      if (!result.ok) {
+        message.error(t(kioskErrorKey(result.error)));
+        return;
+      }
+
+      setGeneratedId(result.value.visitCode);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (employeeWelcome) {
@@ -278,7 +304,7 @@ export default function EnterForm({ onClose }: EnterFormProps) {
           <Space style={{ width: '100%', justifyContent: 'space-between' }} wrap>
             <div>
               <Title level={2} style={{ color: 'rgb(0, 114, 151)', margin: 0 }}>
-                تسجيل دخول زائر
+                {t('visitor.checkInHeading')}
               </Title>
               <Text type="secondary" style={{ fontSize: 16 }}>
                 {t('visitor.enterTitle')}
@@ -685,10 +711,10 @@ export default function EnterForm({ onClose }: EnterFormProps) {
             </Form.Item>
 
             <Space style={{ width: '100%', justifyContent: 'flex-end' }} size="middle">
-              <Button size="large" onClick={onClose}>
+              <Button size="large" onClick={onClose} disabled={submitting}>
                 {t('common.cancel')}
               </Button>
-              <Button type="primary" size="large" htmlType="submit">
+              <Button type="primary" size="large" htmlType="submit" loading={submitting}>
                 {t('common.submit')}
               </Button>
             </Space>
