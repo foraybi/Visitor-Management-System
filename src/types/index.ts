@@ -100,7 +100,10 @@ export interface ExitFormData {
 
 export interface VisitorState {
   visitors: Visitor[];
-  addVisitor: (data: EnterFormData) => string;
+  /**
+   * There is no addVisitor. A visit is created only by /api/kiosk/check-in,
+   * which allocates the visit code server-side; see the note in visitorStore.
+   */
   exitVisitor: (id: string) => boolean;
   getVisitorById: (id: string) => Visitor | undefined;
   getTodayVisitors: () => Visitor[];

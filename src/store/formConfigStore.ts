@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from '../data/persist';
 import { supabase } from '../lib/supabase';
 
 export type VisitorFormFieldKey =
@@ -45,13 +46,21 @@ interface FormConfigState {
   isVisible: (key: VisitorFormFieldKey) => boolean;
 }
 
-function upsertToDb(fields: FormFieldConfig[]) {
-  supabase
-    .from('form_config')
-    .upsert({ id: 1, fields, updated_at: new Date().toISOString() })
-    .then(({ error }) => {
-      if (error) console.error('Failed to save form config:', error);
-    });
+/**
+ * Save the field configuration, restoring the previous set if it does not land.
+ *
+ * This config decides which fields the kiosk shows, so a silently failed save
+ * meant the admin saw their change and the tablets never received it.
+ */
+function upsertToDb(fields: FormFieldConfig[], rollback: () => void) {
+  void persist(
+    'formConfig.save',
+    () =>
+      supabase
+        .from('form_config')
+        .upsert({ id: 1, fields, updated_at: new Date().toISOString() }),
+    rollback,
+  );
 }
 
 export const useFormConfigStore = create<FormConfigState>()((set, get) => ({
@@ -81,21 +90,24 @@ export const useFormConfigStore = create<FormConfigState>()((set, get) => ({
   },
 
   setFields: (fields) => {
+    const previous = get().fields;
     set({ fields });
-    upsertToDb(fields);
+    upsertToDb(fields, () => set({ fields: previous }));
   },
 
   toggleVisible: (key) => {
-    const fields = get().fields.map(f =>
+    const previous = get().fields;
+    const fields = previous.map(f =>
       f.key === key && !f.alwaysRequired ? { ...f, visible: !f.visible } : f
     );
     set({ fields });
-    upsertToDb(fields);
+    upsertToDb(fields, () => set({ fields: previous }));
   },
 
   reset: () => {
+    const previous = get().fields;
     set({ fields: DEFAULT_ORDER });
-    upsertToDb(DEFAULT_ORDER);
+    upsertToDb(DEFAULT_ORDER, () => set({ fields: previous }));
   },
 
   isVisible: (key) => get().fields.find(f => f.key === key)?.visible ?? false,

@@ -1,9 +1,8 @@
 import { create } from 'zustand';
-import type { Visitor, VisitorState, EnterFormData } from '../types';
-import { generateVisitorId } from '../utils/idGenerator';
+import type { VisitorState } from '../types';
 import { getCurrentTimestamp, getTodayDateString } from '../utils/timeUtils';
-import { getCountryLabel } from '../utils/countryData';
-import { supabase, toVisitor, fromVisitor } from '../lib/supabase';
+import { persist } from '../data/persist';
+import { supabase, toVisitor } from '../lib/supabase';
 
 interface ExtendedVisitorState extends VisitorState {
   loaded: boolean;
@@ -57,30 +56,16 @@ export const useVisitorStore = create<ExtendedVisitorState>()((set, get) => ({
     return () => { supabase.removeChannel(channel); };
   },
 
-  addVisitor: (data: EnterFormData) => {
-    const today = getTodayDateString();
-    const existing = get().visitors.map(v => ({ id: v.id, date: v.date }));
-    const newId = generateVisitorId(existing, today);
-    const newVisitor: Visitor = {
-      ...data,
-      id: newId,
-      countryName: getCountryLabel(data.countryCode, 'en'),
-      entryTime: getCurrentTimestamp(),
-      exitTime: null,
-      status: 'active',
-      date: today,
-    };
-    // Optimistic update — UI is instant
-    set(state => ({ visitors: [newVisitor, ...state.visitors] }));
-    // Persist to Supabase — triggers realtime event on all other devices
-    supabase
-      .from('visitors')
-      .insert(fromVisitor(newVisitor))
-      .then(({ error }) => {
-        if (error) console.error('Failed to insert visitor:', error);
-      });
-    return newId;
-  },
+  /*
+   * addVisitor is deliberately absent.
+   *
+   * A visit is created only by /api/kiosk/check-in, which allocates the visit
+   * code from a per-day counter in Postgres. The browser-side version counted
+   * today's rows and padded to four digits, which restarted every morning
+   * against a TEXT PRIMARY KEY and silently lost every visit from the second day
+   * onward. There is also no insert policy for any signed-in user, so a second
+   * write path here could not succeed even if one were added.
+   */
 
   exitVisitor: (id: string) => {
     const visitor = get().visitors.find(v => v.id === id);
@@ -92,14 +77,15 @@ export const useVisitorStore = create<ExtendedVisitorState>()((set, get) => ({
         v.id === id ? { ...v, exitTime, status: 'exited' } : v
       ),
     }));
-    // Persist to Supabase — triggers realtime UPDATE on all other devices
-    supabase
-      .from('visitors')
-      .update({ exit_time: exitTime, status: 'exited' })
-      .eq('id', id)
-      .then(({ error }) => {
-        if (error) console.error('Failed to update visitor exit:', error);
-      });
+    // Persist, rolling the row back to open if the update does not land. The
+    // front desk must not be shown a visitor as departed when the database
+    // still has them inside the building.
+    const previous = get().visitors;
+    void persist(
+      'visitor.exit',
+      () => supabase.from('visitors').update({ exit_time: exitTime, status: 'exited' }).eq('id', id),
+      () => set({ visitors: previous }),
+    );
     return true;
   },
 

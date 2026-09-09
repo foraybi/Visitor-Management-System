@@ -14,7 +14,8 @@
     "done": "تم",
     "next": "التالي",
     "back": "رجوع",
-    "required": "هذا الحقل مطلوب"
+    "required": "هذا الحقل مطلوب",
+    "writeFailed": "تعذّر الحفظ: {{action}}. تم التراجع عن التغيير."
   },
   "visitor": {
     "welcome": "مرحبا بك في نظام زوار",
@@ -244,5 +245,22 @@
     "email": "البريد الإلكتروني",
     "emailInvalid": "أدخل بريدًا إلكترونيًا صحيحًا",
     "signIn": "تسجيل الدخول"
+  },
+  "actions": {
+    "company.add": "إضافة الشركة",
+    "company.update": "تحديث الشركة",
+    "company.delete": "حذف الشركة",
+    "employee.add": "إضافة الموظف",
+    "employee.addMany": "إضافة الموظفين",
+    "employee.update": "تحديث الموظف",
+    "employee.delete": "حذف الموظف",
+    "employee.verify": "توثيق الموظف",
+    "floor.add": "إضافة الدور",
+    "floor.update": "تحديث الدور",
+    "floor.delete": "حذف الدور",
+    "floor.seed": "إنشاء الأدوار الافتراضية",
+    "visitor.exit": "تسجيل خروج الزائر",
+    "formConfig.save": "حفظ إعدادات النموذج",
+    "documentSettings.save": "حفظ إعدادات المستند"
   }
 }

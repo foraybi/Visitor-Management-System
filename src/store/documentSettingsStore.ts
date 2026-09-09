@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from '../data/persist';
 import { supabase, uploadFile, urlToBase64 } from '../lib/supabase';
 
 export interface DocumentSettings {
@@ -35,10 +36,13 @@ const DEFAULTS: DocumentSettings = {
   logoDataUrl: '',
 };
 
-function upsertToDb(s: DocumentSettings) {
-  supabase
-    .from('document_settings')
-    .upsert({
+function upsertToDb(s: DocumentSettings, rollback: () => void) {
+  void persist(
+    'documentSettings.save',
+    () =>
+      supabase
+      .from('document_settings')
+      .upsert({
       id: 1,
       admission_name: s.admissionName,
       admission_label: s.admissionLabel,
@@ -47,12 +51,11 @@ function upsertToDb(s: DocumentSettings) {
       vision_number: s.visionNumber,
       vision_number_label: s.visionNumberLabel,
       form_name: s.formName,
-      logo_url: s.logoUrl,
-      updated_at: new Date().toISOString(),
-    })
-    .then(({ error }) => {
-      if (error) console.error('Failed to save document settings:', error);
-    });
+        logo_url: s.logoUrl,
+        updated_at: new Date().toISOString(),
+      }),
+    rollback,
+  );
 }
 
 export const useDocumentSettingsStore = create<DocumentSettingsState>()((set, get) => ({
@@ -89,28 +92,32 @@ export const useDocumentSettingsStore = create<DocumentSettingsState>()((set, ge
   },
 
   setSettings: (s) => {
-    const settings = { ...get().settings, ...s };
+    const previous = get().settings;
+    const settings = { ...previous, ...s };
     set({ settings });
-    upsertToDb(settings);
+    upsertToDb(settings, () => set({ settings: previous }));
   },
 
   uploadLogo: async (file: File) => {
     const ext = file.name.split('.').pop() ?? 'png';
     const logoUrl = await uploadFile('document-logos', `logo.${ext}`, file);
     const logoDataUrl = await urlToBase64(logoUrl);
-    const settings = { ...get().settings, logoUrl, logoDataUrl };
+    const previous = get().settings;
+    const settings = { ...previous, logoUrl, logoDataUrl };
     set({ settings });
-    upsertToDb(settings);
+    upsertToDb(settings, () => set({ settings: previous }));
   },
 
   removeLogo: () => {
-    const settings = { ...get().settings, logoUrl: '', logoDataUrl: '' };
+    const previous = get().settings;
+    const settings = { ...previous, logoUrl: '', logoDataUrl: '' };
     set({ settings });
-    upsertToDb(settings);
+    upsertToDb(settings, () => set({ settings: previous }));
   },
 
   reset: () => {
+    const previous = get().settings;
     set({ settings: DEFAULTS });
-    upsertToDb(DEFAULTS);
+    upsertToDb(DEFAULTS, () => set({ settings: previous }));
   },
 }));

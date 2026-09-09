@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { Company, Employee, CompanyState } from '../types';
 import { generateId } from '../utils/idGenerator';
 import { supabase, toCompany, fromCompany, fromEmployee } from '../lib/supabase';
+import { persist } from '../data/persist';
 
 interface ExtendedCompanyState extends CompanyState {
   loaded: boolean;
@@ -27,24 +28,48 @@ export const useCompanyStore = create<ExtendedCompanyState>()((set, get) => ({
   addCompany: (data: Omit<Company, 'id'>) => {
     const id = generateId();
     const company: Company = { ...data, id };
+    const previous = get().companies;
     set(state => ({ companies: [...state.companies, company] }));
-    supabase
-      .from('companies')
-      .insert(fromCompany({ id, name: data.name, nameAr: data.nameAr, logoUrl: data.logoUrl, phone: data.phone, floor: data.floor }))
-      .then(({ error }) => {
-        if (error) { console.error('Failed to insert company:', error); return; }
-        if (data.employees && data.employees.length > 0) {
+
+    void (async () => {
+      const created = await persist(
+        'company.add',
+        () =>
           supabase
-            .from('employees')
-            .insert(data.employees.map(e => fromEmployee(e, id)))
-            .then(({ error: eErr }) => {
-              if (eErr) console.error('Failed to insert employees:', eErr);
-            });
-        }
-      });
+            .from('companies')
+            .insert(
+              fromCompany({
+                id,
+                name: data.name,
+                nameAr: data.nameAr,
+                logoUrl: data.logoUrl,
+                phone: data.phone,
+                floor: data.floor,
+              }),
+            ),
+        () => set({ companies: previous }),
+      );
+      if (!created) return;
+
+      if (data.employees && data.employees.length > 0) {
+        // The company landed but its employees did not, so roll back only the
+        // employees rather than discarding a company that now exists.
+        await persist(
+          'employee.addMany',
+          () => supabase.from('employees').insert(data.employees.map(e => fromEmployee(e, id))),
+          () =>
+            set(state => ({
+              companies: state.companies.map(c =>
+                c.id === id ? { ...c, employees: [], employeeCount: 0 } : c,
+              ),
+            })),
+        );
+      }
+    })();
   },
 
   updateCompany: (id: string, data: Partial<Company>) => {
+    const previous = get().companies;
     set(state => ({
       companies: state.companies.map(c => (c.id === id ? { ...c, ...data } : c)),
     }));
@@ -55,30 +80,28 @@ export const useCompanyStore = create<ExtendedCompanyState>()((set, get) => ({
     if (data.phone !== undefined) row.phone = data.phone;
     if (data.floor !== undefined) row.floor = data.floor;
     if (Object.keys(row).length > 0) {
-      supabase
-        .from('companies')
-        .update(row)
-        .eq('id', id)
-        .then(({ error }) => {
-          if (error) console.error('Failed to update company:', error);
-        });
+      void persist(
+        'company.update',
+        () => supabase.from('companies').update(row).eq('id', id),
+        () => set({ companies: previous }),
+      );
     }
   },
 
   deleteCompany: (id: string) => {
+    const previous = get().companies;
     set(state => ({ companies: state.companies.filter(c => c.id !== id) }));
-    supabase
-      .from('companies')
-      .delete()
-      .eq('id', id)
-      .then(({ error }) => {
-        if (error) console.error('Failed to delete company:', error);
-      });
+    void persist(
+      'company.delete',
+      () => supabase.from('companies').delete().eq('id', id),
+      () => set({ companies: previous }),
+    );
   },
 
   addEmployee: (companyId: string, employee: Omit<Employee, 'id'>) => {
     const id = generateId();
     const newEmployee: Employee = { ...employee, id };
+    const previous = get().companies;
     set(state => ({
       companies: state.companies.map(c =>
         c.id === companyId
@@ -86,15 +109,15 @@ export const useCompanyStore = create<ExtendedCompanyState>()((set, get) => ({
           : c
       ),
     }));
-    supabase
-      .from('employees')
-      .insert(fromEmployee(newEmployee, companyId))
-      .then(({ error }) => {
-        if (error) console.error('Failed to insert employee:', error);
-      });
+    void persist(
+      'employee.add',
+      () => supabase.from('employees').insert(fromEmployee(newEmployee, companyId)),
+      () => set({ companies: previous }),
+    );
   },
 
   updateEmployee: (companyId: string, employeeId: string, data: Partial<Employee>) => {
+    const previous = get().companies;
     set(state => ({
       companies: state.companies.map(c =>
         c.id === companyId
@@ -121,17 +144,16 @@ export const useCompanyStore = create<ExtendedCompanyState>()((set, get) => ({
     if (data.notes !== undefined) row.notes = data.notes ?? null;
     if (data.verificationStatus !== undefined) row.verification_status = data.verificationStatus;
     if (Object.keys(row).length > 0) {
-      supabase
-        .from('employees')
-        .update(row)
-        .eq('id', employeeId)
-        .then(({ error }) => {
-          if (error) console.error('Failed to update employee:', error);
-        });
+      void persist(
+        'employee.update',
+        () => supabase.from('employees').update(row).eq('id', employeeId),
+        () => set({ companies: previous }),
+      );
     }
   },
 
   deleteEmployee: (companyId: string, employeeId: string) => {
+    const previous = get().companies;
     set(state => ({
       companies: state.companies.map(c =>
         c.id === companyId
@@ -143,16 +165,15 @@ export const useCompanyStore = create<ExtendedCompanyState>()((set, get) => ({
           : c
       ),
     }));
-    supabase
-      .from('employees')
-      .delete()
-      .eq('id', employeeId)
-      .then(({ error }) => {
-        if (error) console.error('Failed to delete employee:', error);
-      });
+    void persist(
+      'employee.delete',
+      () => supabase.from('employees').delete().eq('id', employeeId),
+      () => set({ companies: previous }),
+    );
   },
 
   verifyEmployee: (companyId: string, employeeId: string) => {
+    const previous = get().companies;
     set(state => ({
       companies: state.companies.map(c =>
         c.id === companyId
@@ -165,13 +186,11 @@ export const useCompanyStore = create<ExtendedCompanyState>()((set, get) => ({
           : c
       ),
     }));
-    supabase
-      .from('employees')
-      .update({ verification_status: 'verified' })
-      .eq('id', employeeId)
-      .then(({ error }) => {
-        if (error) console.error('Failed to verify employee:', error);
-      });
+    void persist(
+      'employee.verify',
+      () => supabase.from('employees').update({ verification_status: 'verified' }).eq('id', employeeId),
+      () => set({ companies: previous }),
+    );
   },
 
   findEmployeeByIdNumber: (idNumber: string) => {

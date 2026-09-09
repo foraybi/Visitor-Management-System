@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { FloorInfo } from '../types';
 import { generateId } from '../utils/idGenerator';
+import { persist } from '../data/persist';
 import { supabase, toFloor, fromFloor } from '../lib/supabase';
 
 interface FloorState {
@@ -32,16 +33,17 @@ export const useFloorStore = create<FloorState>()((set, get) => ({
   addFloor: (data) => {
     const id = generateId();
     const floor: FloorInfo = { ...data, id };
+    const previous = get().floors;
     set(state => ({ floors: [...state.floors, floor] }));
-    supabase
-      .from('floors')
-      .insert(fromFloor(floor))
-      .then(({ error }) => {
-        if (error) console.error('Failed to insert floor:', error);
-      });
+    void persist(
+      'floor.add',
+      () => supabase.from('floors').insert(fromFloor(floor)),
+      () => set({ floors: previous }),
+    );
   },
 
   updateFloor: (id, data) => {
+    const previous = get().floors;
     set(state => ({
       floors: state.floors.map(f => (f.id === id ? { ...f, ...data } : f)),
     }));
@@ -51,25 +53,22 @@ export const useFloorStore = create<FloorState>()((set, get) => ({
     if (data.nameAr !== undefined) row.name_ar = data.nameAr;
     if (data.imageUrl !== undefined) row.image_url = data.imageUrl || null;
     if (Object.keys(row).length > 0) {
-      supabase
-        .from('floors')
-        .update(row)
-        .eq('id', id)
-        .then(({ error }) => {
-          if (error) console.error('Failed to update floor:', error);
-        });
+      void persist(
+        'floor.update',
+        () => supabase.from('floors').update(row).eq('id', id),
+        () => set({ floors: previous }),
+      );
     }
   },
 
   deleteFloor: (id) => {
+    const previous = get().floors;
     set(state => ({ floors: state.floors.filter(f => f.id !== id) }));
-    supabase
-      .from('floors')
-      .delete()
-      .eq('id', id)
-      .then(({ error }) => {
-        if (error) console.error('Failed to delete floor:', error);
-      });
+    void persist(
+      'floor.delete',
+      () => supabase.from('floors').delete().eq('id', id),
+      () => set({ floors: previous }),
+    );
   },
 
   seedDefaults: () => {
@@ -80,11 +79,10 @@ export const useFloorStore = create<FloorState>()((set, get) => ({
       { id: generateId(), number: 3, name: 'Third Floor', nameAr: 'الطابق الثالث', imageUrl: '' },
     ];
     set({ floors: defaults });
-    supabase
-      .from('floors')
-      .insert(defaults.map(fromFloor))
-      .then(({ error }) => {
-        if (error) console.error('Failed to seed floors:', error);
-      });
+    void persist(
+      'floor.seed',
+      () => supabase.from('floors').insert(defaults.map(fromFloor)),
+      () => set({ floors: [] }),
+    );
   },
 }));

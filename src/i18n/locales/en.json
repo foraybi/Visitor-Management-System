@@ -14,7 +14,8 @@
     "done": "Done",
     "next": "Next",
     "back": "Back",
-    "required": "This field is required"
+    "required": "This field is required",
+    "writeFailed": "Could not save: {{action}}. Your change was undone."
   },
   "visitor": {
     "welcome": "Welcome to Zuaar",
@@ -244,5 +245,22 @@
     "email": "Email",
     "emailInvalid": "Enter a valid email address",
     "signIn": "Sign in"
+  },
+  "actions": {
+    "company.add": "adding the company",
+    "company.update": "updating the company",
+    "company.delete": "deleting the company",
+    "employee.add": "adding the employee",
+    "employee.addMany": "adding employees",
+    "employee.update": "updating the employee",
+    "employee.delete": "deleting the employee",
+    "employee.verify": "verifying the employee",
+    "floor.add": "adding the floor",
+    "floor.update": "updating the floor",
+    "floor.delete": "deleting the floor",
+    "floor.seed": "creating the default floors",
+    "visitor.exit": "checking the visitor out",
+    "formConfig.save": "saving the form settings",
+    "documentSettings.save": "saving the document settings"
   }
 }

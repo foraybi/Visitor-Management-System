@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { Spin } from 'antd';
+import { Spin, message } from 'antd';
 import AppTheme from '../AppTheme';
 import ErrorBoundary from '../ErrorBoundary';
 import { can, homeRouteFor, type Permission } from '../../domain/access/access';
@@ -10,6 +11,7 @@ import { useDocumentSettingsStore } from '../../store/documentSettingsStore';
 import { useFloorStore } from '../../store/floorStore';
 import { useFormConfigStore } from '../../store/formConfigStore';
 import { useVisitorStore } from '../../store/visitorStore';
+import { setWriteFailureReporter } from '../../data/persist';
 
 /**
  * The staff app: front desk and admin, on one origin, separated by role.
@@ -158,6 +160,26 @@ function StaffRoutes() {
 
 export default function StaffApp() {
   const initialize = useAuthStore((s) => s.initialize);
+  const { t } = useTranslation();
+  const [messageApi, messageHolder] = message.useMessage();
+
+  /*
+   * Route write failures to a toast.
+   *
+   * The stores keep their optimistic updates, so the interface still feels
+   * immediate, but a write that does not land now rolls back and says so.
+   * Sixteen call sites previously logged the error to a console nobody was
+   * watching and left the failed change on screen looking successful.
+   */
+  useEffect(() => {
+    setWriteFailureReporter((action, detail) => {
+      messageApi.error({
+        content: t('common.writeFailed', { action: t(`actions.${action}`, action) }),
+        duration: 6,
+      });
+      console.error(`[write failed] ${action}: ${detail}`);
+    });
+  }, [messageApi, t]);
 
   useEffect(() => {
     // initialize resolves to its own unsubscribe, so the auth listener is torn
@@ -182,6 +204,7 @@ export default function StaffApp() {
   return (
     <ErrorBoundary label="staff">
       <AppTheme>
+        {messageHolder}
         <BrowserRouter>
           <StaffRoutes />
         </BrowserRouter>
