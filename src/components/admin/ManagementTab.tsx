@@ -470,11 +470,15 @@ export default function ManagementTab() {
   const handleCreateStaff = async (values: { email: string; password: string; fullName: string }) => {
     setStaffSubmitting(true);
     setStaffError('');
-    // Create the auth user with the secondary client (won't affect admin session)
+    // Created with the secondary client so this does not replace the admin's own
+    // session. Note what is NOT passed: the role. It used to be written into
+    // user_metadata, which is the claim the user themselves can edit, so the
+    // account could promote itself from the browser console. The role lives in
+    // the profiles row below, which only a superadmin may change.
     const { data, error } = await supabaseCreator.auth.signUp({
       email: values.email,
       password: values.password,
-      options: { data: { role: 'frontdesk', full_name: values.fullName } },
+      options: { data: { full_name: values.fullName } },
     });
     if (error || !data.user) {
       setStaffError(error?.message ?? 'Failed to create account.');
@@ -500,10 +504,19 @@ export default function ManagementTab() {
     void fetchStaff();
   };
 
+  /**
+   * Remove a front desk account.
+   *
+   * Deleting the profile row now genuinely revokes access. The app reads the
+   * role from this table, so a sign-in with no profile row is refused and the
+   * session is dropped. Previously the role came from the JWT, which meant a
+   * "removed" user kept working indefinitely, as the old confirmation text
+   * admitted.
+   */
   const handleDeleteStaff = async (id: string) => {
     const { error } = await supabase.from('profiles').delete().eq('id', id);
     if (error) { message.error('Failed to remove account.'); return; }
-    message.success('Account removed from front desk.');
+    message.success('Account removed. Their access is revoked.');
     setStaffList(prev => prev.filter(s => s.id !== id));
   };
 
@@ -533,7 +546,7 @@ export default function ManagementTab() {
       render: (_, record) => (
         <Popconfirm
           title="Remove this front desk account?"
-          description="The user will no longer appear here but their login may still work until removed from Supabase Auth."
+          description="Access is revoked immediately: the role is read from this row, so the account can no longer sign in to the app."
           onConfirm={() => handleDeleteStaff(record.id)}
           okText="Remove"
           okButtonProps={{ danger: true }}
