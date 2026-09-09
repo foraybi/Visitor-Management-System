@@ -1,8 +1,8 @@
 -- =============================================
 -- Visitor Management System - Supabase Schema
 -- =============================================
--- Run this in the Supabase SQL Editor:
--- https://supabase.com/dashboard/project/nidiuwxozsxydqfvjmll/editor
+-- Baseline. This is the schema as it stood before the production hardening
+-- migrations that follow. Do not edit: later migrations amend it.
 
 -- Floors
 CREATE TABLE IF NOT EXISTS floors (
