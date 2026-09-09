@@ -34,6 +34,8 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import type { UploadProps } from 'antd';
 import dayjs from 'dayjs';
+import type { CompanyFormValues, EmployeeFormValues } from '../../types/forms';
+import { presenceIndex } from '../../domain/presence/presence';
 import { useCompanyStore } from '../../store/companyStore';
 import { useFloorStore } from '../../store/floorStore';
 import { useVisitorStore } from '../../store/visitorStore';
@@ -85,7 +87,7 @@ export default function ManagementTab() {
     companyForm.setFieldsValue(company);
     setCompanyModalOpen(true);
   };
-  const handleCompanySubmit = (values: any) => {
+  const handleCompanySubmit = (values: CompanyFormValues) => {
     if (editingCompany) {
       updateCompany(editingCompany.id, values);
     } else {
@@ -126,7 +128,7 @@ export default function ManagementTab() {
     setEmployeeModalOpen(true);
   };
 
-  const handleEmployeeSubmit = async (values: any) => {
+  const handleEmployeeSubmit = async (values: EmployeeFormValues) => {
     setPhotoUploading(true);
     let resolvedPhotoUrl = photoDataUrl;
     if (photoFile) {
@@ -150,7 +152,9 @@ export default function ManagementTab() {
       nationalityIdNumber: values.nationalityIdNumber,
       countryCode: values.countryCode,
       gender: values.gender,
-      employmentStatus: values.employmentStatus,
+      // Matches the front desk form, which defaults the same way. A new
+      // employee with no status selected is active.
+      employmentStatus: values.employmentStatus ?? 'active',
       jobType: values.jobType,
       department: values.department,
       position: values.position,
@@ -172,27 +176,11 @@ export default function ManagementTab() {
   };
 
   // ─── Derived: per-employee visit status ───
-  // Match visitors of type 'employee' by nationalityIdNumber (which holds employeeNumber)
-  const employeeVisitMap = useMemo(() => {
-    const map = new Map<string, { lastVisit: string | null; lastEntry: string | null; lastExit: string | null; inside: boolean; everVisited: boolean }>();
-    for (const v of visitors) {
-      if (v.visitorType !== 'employee') continue;
-      const key = v.nationalityIdNumber; // = employeeNumber
-      const prev = map.get(key);
-      const entry = v.entryTime;
-      const exit = v.exitTime;
-      if (!prev || (entry > (prev.lastEntry ?? ''))) {
-        map.set(key, {
-          lastVisit: v.date,
-          lastEntry: entry,
-          lastExit: exit,
-          inside: v.status === 'active',
-          everVisited: true,
-        });
-      }
-    }
-    return map;
-  }, [visitors]);
+  // Built by the presence module so the join key is explicit. This block
+  // previously indexed on the identity number a visit was recorded under and
+  // then looked it up by the employee number, so it never matched and every
+  // employee showed as never having visited.
+  const presence = useMemo(() => presenceIndex(visitors), [visitors]);
 
   // ─── Tables ───
   const companyColumns: ColumnsType<Company> = [
@@ -339,8 +327,8 @@ export default function ManagementTab() {
       key: 'visitStatus',
       width: 140,
       render: (_, r) => {
-        const v = employeeVisitMap.get(r.employeeNumber);
-        if (!v || !v.everVisited)
+        const v = presence.stateFor(r);
+        if (!v.everVisited)
           return <Tag color="default">{t('employee.neverVisited')}</Tag>;
         if (v.inside)
           return (
@@ -357,11 +345,11 @@ export default function ManagementTab() {
       key: 'lastVisit',
       width: 130,
       render: (_, r) => {
-        const v = employeeVisitMap.get(r.employeeNumber);
-        if (!v?.lastVisit) return <span style={{ color: '#bfbfbf' }}>—</span>;
+        const v = presence.stateFor(r);
+        if (!v.lastVisitDate) return <span style={{ color: '#bfbfbf' }}>—</span>;
         return (
           <span style={{ fontSize: 11 }}>
-            {v.lastVisit}
+            {v.lastVisitDate}
             <br />
             <span style={{ color: '#888' }}>
               {formatTimeFromISO(v.lastEntry)}{v.lastExit ? ` → ${formatTimeFromISO(v.lastExit)}` : ''}
@@ -424,33 +412,60 @@ export default function ManagementTab() {
 
   // ─── Staff accounts ───
   const [staffList, setStaffList] = useState<StaffProfile[]>([]);
-  const [staffLoading, setStaffLoading] = useState(false);
+  // Starts true: the list is fetched on mount, so the first paint is a load.
+  const [staffLoading, setStaffLoading] = useState(true);
   const [staffModalOpen, setStaffModalOpen] = useState(false);
   const [staffError, setStaffError] = useState('');
   const [staffSubmitting, setStaffSubmitting] = useState(false);
   const [staffForm] = Form.useForm();
 
-  const fetchStaff = useCallback(async () => {
-    setStaffLoading(true);
+  /**
+   * Pure loader: reads the staff list and returns it, touching no state.
+   *
+   * Separated from the state update so the effect below can await it and set
+   * state in the continuation rather than synchronously in the effect body,
+   * which triggers a cascading render.
+   *
+   * This whole block belongs in a store. `profiles` is the only table with no
+   * store of its own, which is why account management lives inside this
+   * component at all.
+   */
+  const loadStaff = useCallback(async (): Promise<StaffProfile[]> => {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('role', 'frontdesk')
       .order('created_at', { ascending: false });
-    setStaffLoading(false);
-    if (error) { console.error(error); return; }
-    setStaffList(
-      (data ?? []).map(r => ({
-        id: r.id,
-        email: r.email,
-        fullName: r.full_name ?? null,
-        role: r.role,
-        createdAt: r.created_at,
-      }))
-    );
+    if (error) {
+      console.error(error);
+      return [];
+    }
+    return (data ?? []).map(r => ({
+      id: r.id,
+      email: r.email,
+      fullName: r.full_name ?? null,
+      role: r.role,
+      createdAt: r.created_at,
+    }));
   }, []);
 
-  useEffect(() => { fetchStaff(); }, [fetchStaff]);
+  const fetchStaff = useCallback(async () => {
+    setStaffList(await loadStaff());
+    setStaffLoading(false);
+  }, [loadStaff]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const rows = await loadStaff();
+      if (cancelled) return;
+      setStaffList(rows);
+      setStaffLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadStaff]);
 
   const handleCreateStaff = async (values: { email: string; password: string; fullName: string }) => {
     setStaffSubmitting(true);
@@ -481,7 +496,8 @@ export default function ManagementTab() {
     message.success(`Front desk account created for ${values.email}`);
     setStaffModalOpen(false);
     staffForm.resetFields();
-    fetchStaff();
+    setStaffLoading(true);
+    void fetchStaff();
   };
 
   const handleDeleteStaff = async (id: string) => {

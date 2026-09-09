@@ -17,6 +17,7 @@ import {
 import { UploadOutlined, ReloadOutlined, SaveOutlined } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
 import { useDocumentSettingsStore } from '../../store/documentSettingsStore';
+import type { DocumentSettings } from '../../store/documentSettingsStore';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -31,7 +32,7 @@ export default function DocumentSettingsTab() {
   const [form] = Form.useForm();
   const [logoUploading, setLogoUploading] = useState(false);
 
-  const onFinish = (values: any) => {
+  const onFinish = (values: Partial<DocumentSettings>) => {
     setSettings(values);
     message.success(t('common.save'));
   };

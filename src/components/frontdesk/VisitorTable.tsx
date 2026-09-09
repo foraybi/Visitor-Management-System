@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, Table, Input, Select, Tag, Button, Row, Col, DatePicker, Tooltip, Space } from 'antd';
 import { SearchOutlined, LogoutOutlined, FilePdfOutlined, FileExcelOutlined } from '@ant-design/icons';
@@ -38,21 +38,35 @@ export default function VisitorTable() {
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
   const [periodMode, setPeriodMode] = useState<PeriodMode>('all');
 
-  // Live-tick: re-render every 60s so Time Spent stays current for active visitors
-  const [, setNow] = useState(Date.now());
+  // Live-tick: re-render every 60s so Time Spent stays current for active
+  // visitors. A counter rather than Date.now(), so nothing impure is read
+  // during render; the cells read the clock themselves when they format.
+  const [, setTick] = useState(0);
   useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 60_000);
+    const id = window.setInterval(() => setTick(t => t + 1), 60_000);
     return () => window.clearInterval(id);
   }, []);
 
+  // Index once rather than scanning the list per row. The search filter runs
+  // this per visitor on every keystroke, so a linear find made filtering
+  // O(visitors x companies).
+  const companiesById = useMemo(
+    () => new Map(companies.map(c => [c.id, c])),
+    [companies],
+  );
+  const floorsByNumber = useMemo(
+    () => new Map(floors.map(f => [f.number, f])),
+    [floors],
+  );
+
   const companyName = (id: string) => {
-    const c = companies.find(x => x.id === id);
+    const c = companiesById.get(id);
     if (!c) return id;
     return language === 'ar' ? c.nameAr : c.name;
   };
 
   const floorName = (num: number) => {
-    const f = floors.find(x => x.number === num);
+    const f = floorsByNumber.get(num);
     if (!f) return `${t('visitor.floor')} ${num}`;
     return language === 'ar' ? f.nameAr : f.name;
   };
@@ -215,10 +229,11 @@ export default function VisitorTable() {
         v.phone.includes(searchTerm) ||
         (v.email ?? '').toLowerCase().includes(term) ||
         v.nationalityIdNumber.toLowerCase().includes(term) ||
-        companyName(v.visitedCompanyId).toLowerCase().includes(term);
+        (companiesById.get(v.visitedCompanyId)?.name ?? '').toLowerCase().includes(term) ||
+        (companiesById.get(v.visitedCompanyId)?.nameAr ?? '').includes(searchTerm);
       return floorMatch && searchMatch;
     });
-  }, [dateFilteredVisitors, selectedFloor, searchTerm, companies, language]);
+  }, [dateFilteredVisitors, selectedFloor, searchTerm, companiesById]);
 
   // Show the Date column only when the filter spans more than today
   const showDateColumn = useMemo(() => {

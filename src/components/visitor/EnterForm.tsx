@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Form,
@@ -38,11 +38,31 @@ import type { EnterFormData, NationalityType, VisitorType } from '../../types';
 
 const { Title, Text, Paragraph } = Typography;
 
-const DRAFT_KEY = 'vms-visitor-draft';
-const DRAFT_TTL_MS = 10_000;
 
 interface EnterFormProps {
   onClose: () => void;
+}
+
+/** The fields the check-in form collects. Optional where the form branches. */
+interface CheckInFormValues {
+  visitorType: 'visitor' | 'employee';
+  visitedCompanyId: string;
+  nationalityType: NationalityType;
+  nationalityIdNumber: string;
+  name?: string;
+  phone?: string;
+  email?: string;
+  countryCode?: string;
+  employeeNumber?: string;
+  agreedToTerms?: boolean;
+}
+
+/**
+ * Match against the searchText we attach to each option so a company or country
+ * is findable by either its Arabic or its English name.
+ */
+function filterBySearchText(input: string, option?: { searchText?: string }): boolean {
+  return (option?.searchText ?? '').includes(input.toLowerCase());
 }
 
 export default function EnterForm({ onClose }: EnterFormProps) {
@@ -76,36 +96,11 @@ export default function EnterForm({ onClose }: EnterFormProps) {
   const countryRef = useRef<RefSelectProps>(null);
 
   // ─── Draft recovery on mount ───
-  useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(DRAFT_KEY);
-      if (!raw) return;
-      const { values, timestamp } = JSON.parse(raw);
-      if (Date.now() - timestamp < DRAFT_TTL_MS) {
-        form.setFieldsValue(values);
-        if (values.visitorType) setVisitorType(values.visitorType);
-        if (values.nationalityType) setNationalityType(values.nationalityType);
-        if (values.floor) setSelectedFloor(values.floor);
-        message.success(t('visitor.draftRestored'));
-      } else {
-        sessionStorage.removeItem(DRAFT_KEY);
-      }
-    } catch {
-      sessionStorage.removeItem(DRAFT_KEY);
-    }
-  }, [form, t]);
-
-  // Save draft on every value change
-  const handleValuesChange = (_: any, all: any) => {
-    try {
-      sessionStorage.setItem(
-        DRAFT_KEY,
-        JSON.stringify({ values: all, timestamp: Date.now() })
-      );
-    } catch {
-      // sessionStorage full / disabled — ignore
-    }
-  };
+  // A kiosk form is never restored across sessions. The previous draft feature
+  // wrote identity numbers to sessionStorage on every keystroke and replayed
+  // them for whoever touched the tablet next, which leaked one visitor's
+  // national id to the following visitor. The idle timeout clears the form
+  // instead.
 
   const nationalityLabels: Record<NationalityType, string> = {
     national_id: language === 'ar' ? 'الهوية الوطنية' : 'National ID',
@@ -179,7 +174,7 @@ export default function EnterForm({ onClose }: EnterFormProps) {
     return null;
   };
 
-  const onSubmit = (values: any) => {
+  const onSubmit = (values: CheckInFormValues) => {
     if (!selectedFloor) {
       message.error(t('visitor.validation.floorRequired'));
       return;
@@ -218,7 +213,6 @@ export default function EnterForm({ onClose }: EnterFormProps) {
         signatureDataUrl,
       };
       addVisitor(data);
-      sessionStorage.removeItem(DRAFT_KEY);
       // Show personalised welcome — no visitor ID generated for employees
       setEmployeeWelcome({
         name: language === 'ar' ? match.employee.nameAr : match.employee.name,
@@ -226,14 +220,24 @@ export default function EnterForm({ onClose }: EnterFormProps) {
       });
       return;
     } else {
+      // The form marks these required, but the values object cannot express
+      // "required only on this branch". Check rather than defaulting, so a
+      // validation gap surfaces as a message instead of an empty name in the
+      // visitor log.
+      const { name, phone, countryCode } = values;
+      if (!name || !phone || !countryCode) {
+        message.error(t('common.required'));
+        return;
+      }
+
       const signatureDataUrl = sigCanvasRef.current?.toDataURL() ?? '';
       data = {
-        name: values.name,
-        phone: values.phone,
+        name,
+        phone,
         email: values.email,
         nationalityType: values.nationalityType,
         nationalityIdNumber: values.nationalityIdNumber,
-        countryCode: values.countryCode,
+        countryCode,
         visitorType: 'visitor',
         visitedCompanyId: values.visitedCompanyId,
         floor: selectedFloor,
@@ -242,7 +246,6 @@ export default function EnterForm({ onClose }: EnterFormProps) {
     }
 
     const id = addVisitor(data);
-    sessionStorage.removeItem(DRAFT_KEY);
     setGeneratedId(id);
   };
 
@@ -292,7 +295,6 @@ export default function EnterForm({ onClose }: EnterFormProps) {
           form={form}
           layout="vertical"
           onFinish={onSubmit}
-          onValuesChange={handleValuesChange}
           requiredMark={true}
           scrollToFirstError
           className="enter-form-large"
@@ -352,9 +354,7 @@ export default function EnterForm({ onClose }: EnterFormProps) {
                     classNames={{ popup: { root: 'enter-form-dropdown' } }}
                     placeholder={t('visitor.validation.selectType')}
                     options={companyOptions}
-                    filterOption={(input, option) =>
-                      ((option as any)?.searchText ?? '').includes(input.toLowerCase())
-                    }
+                    filterOption={filterBySearchText}
                     onChange={(companyId: string) => {
                       const company = companies.find(c => c.id === companyId);
                       if (company) {
@@ -599,9 +599,7 @@ export default function EnterForm({ onClose }: EnterFormProps) {
                       classNames={{ popup: { root: 'enter-form-dropdown' } }}
                       placeholder={t('visitor.countryPlaceholder')}
                       options={countryOptions}
-                      filterOption={(input, option) =>
-                        ((option as any)?.searchText ?? '').includes(input.toLowerCase())
-                      }
+                      filterOption={filterBySearchText}
                     />
                   </Form.Item>
                 </Col>

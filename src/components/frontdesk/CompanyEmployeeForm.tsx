@@ -13,6 +13,7 @@ import {
   message,
 } from 'antd';
 import dayjs from 'dayjs';
+import type { EmployeeFormValues } from '../../types/forms';
 import { useCompanyStore } from '../../store/companyStore';
 import { useUIStore } from '../../store/uiStore';
 import { countries } from '../../utils/countryData';
@@ -50,7 +51,7 @@ export default function CompanyEmployeeForm({ companyId, open, onClose }: Props)
     return [{ required: true }];
   };
 
-  const onFinish = (values: any) => {
+  const onFinish = (values: EmployeeFormValues) => {
     const data: Omit<Employee, 'id'> = {
       employeeNumber: values.employeeNumber,
       name: values.name,

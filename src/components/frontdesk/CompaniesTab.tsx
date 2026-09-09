@@ -22,6 +22,7 @@ import {
   TeamOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import { presenceIndex } from '../../domain/presence/presence';
 import { useCompanyStore } from '../../store/companyStore';
 import { useFloorStore } from '../../store/floorStore';
 import { useUIStore } from '../../store/uiStore';
@@ -48,16 +49,9 @@ export default function CompaniesTab() {
     return language === 'ar' ? f.nameAr : f.name;
   };
 
-  // who's inside the building right now?
-  const insideEmployees = useMemo(() => {
-    const set = new Set<string>();
-    for (const v of visitors) {
-      if (v.visitorType === 'employee' && v.status === 'active') {
-        set.add(v.nationalityIdNumber);
-      }
-    }
-    return set;
-  }, [visitors]);
+  // Who is inside the building right now. Shared with the admin employee table
+  // via the presence module, so the two cannot drift apart again.
+  const presence = useMemo(() => presenceIndex(visitors), [visitors]);
 
   const filteredCompanies = useMemo(() => {
     return companies.filter(c => {
@@ -161,7 +155,7 @@ export default function CompaniesTab() {
       key: 'visitStatus',
       width: 130,
       render: (_, r) =>
-        insideEmployees.has(r.nationalityIdNumber) ? (
+        presence.isInside(r) ? (
           <Tag color="success">
             <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: 'rgb(127,188,66)', marginInlineEnd: 6 }} />
             {t('employee.inside')}
