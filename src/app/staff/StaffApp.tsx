@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Spin } from 'antd';
 import AppTheme from '../AppTheme';
+import ErrorBoundary from '../ErrorBoundary';
 import { can, homeRouteFor, type Permission } from '../../domain/access/access';
 import { useAuthStore } from '../../store/authStore';
 import { useCompanyStore } from '../../store/companyStore';
@@ -179,10 +180,12 @@ export default function StaffApp() {
   }, [initialize]);
 
   return (
-    <AppTheme>
-      <BrowserRouter>
-        <StaffRoutes />
-      </BrowserRouter>
-    </AppTheme>
+    <ErrorBoundary label="staff">
+      <AppTheme>
+        <BrowserRouter>
+          <StaffRoutes />
+        </BrowserRouter>
+      </AppTheme>
+    </ErrorBoundary>
   );
 }

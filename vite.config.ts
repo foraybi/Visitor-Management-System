@@ -1,6 +1,7 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 
 /**
  * One config, two build targets.
@@ -35,11 +36,74 @@ function staffManualChunks(id: string): string | undefined {
   return undefined;
 }
 
+/**
+ * The kiosk's service worker.
+ *
+ * Only the kiosk gets one. The staff app is used on managed machines with a
+ * network, and a service worker there would only add a stale-cache failure
+ * mode. It also matters that the two are separate origins: a service worker's
+ * scope is its origin, so one shared origin would cache staff code onto a
+ * tablet sitting unattended in a lobby.
+ *
+ * registerType is 'prompt', not 'autoUpdate'. An automatic update reloads the
+ * page as soon as a new build lands, which on a kiosk means reloading in the
+ * middle of somebody's check-in. The app applies the update only while it is
+ * sitting on the idle screen.
+ */
+function kioskPwa() {
+  return VitePWA({
+    registerType: 'prompt',
+    includeAssets: ['favicon.svg', 'icons/apple-touch-icon.png'],
+    manifest: {
+      name: 'زوار — نظام إدارة الزوار',
+      short_name: 'زوار',
+      description: 'Visitor check-in kiosk',
+      lang: 'ar',
+      dir: 'rtl',
+      start_url: '/',
+      scope: '/',
+      display: 'fullscreen',
+      orientation: 'landscape',
+      background_color: '#f0f4f8',
+      theme_color: '#007297',
+      icons: [
+        { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+        { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+        { src: '/icons/icon-maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+        { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      ],
+    },
+    workbox: {
+      // The shell, so a reload with no network still renders rather than
+      // showing a blank screen.
+      globPatterns: ['**/*.{js,css,html,woff2,png,svg}'],
+      navigateFallback: '/index.html',
+      // Never let the service worker answer for the API. A cached check-in
+      // response would be a lie: the offline depth agreed for this deployment
+      // is a cached shell with writes that require the network and fail loudly.
+      navigateFallbackDenylist: [/^\/api\//],
+      maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+      runtimeCaching: [
+        {
+          // The company picker, so it is never blank on a slow start. Revalidated
+          // in the background, and explicitly not used for writes.
+          urlPattern: /\/api\/kiosk\/directory$/,
+          handler: 'StaleWhileRevalidate',
+          options: {
+            cacheName: 'kiosk-directory',
+            expiration: { maxEntries: 1, maxAgeSeconds: 24 * 60 * 60 },
+          },
+        },
+      ],
+    },
+  });
+}
+
 export default defineConfig(() => {
   const target = process.env.VITE_APP_TARGET ?? 'staff';
 
   return {
-    plugins: [react()],
+    plugins: [react(), ...(target === 'kiosk' ? [kioskPwa()] : [])],
     server: { host: true },
     build: {
       // Never ship source maps to production; the staff app talks to Supabase

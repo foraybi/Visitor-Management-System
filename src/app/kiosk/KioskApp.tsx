@@ -1,7 +1,10 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import AppTheme from '../AppTheme';
+import ErrorBoundary from '../ErrorBoundary';
 import VisitorPage from '../../pages/VisitorPage';
 import { useKioskStore } from './kioskStore';
+import { useIdleReset, useScreenWakeLock } from './useIdleReset';
+import { useServiceWorkerUpdate } from './useServiceWorker';
 
 /**
  * The tablet.
@@ -18,6 +21,36 @@ import { useKioskStore } from './kioskStore';
  */
 export default function KioskApp() {
   const loadDirectory = useKioskStore((s) => s.loadDirectory);
+
+  /**
+   * Bumping this remounts the whole visitor tree.
+   *
+   * Clearing the form field by field would mean remembering every field, and
+   * the one that gets forgotten is the one holding an identity number. A
+   * remount cannot miss anything.
+   */
+  const [sessionKey, setSessionKey] = useState(0);
+  const [idle, setIdle] = useState(true);
+
+  const resetToWelcome = useCallback(() => {
+    setSessionKey((n) => n + 1);
+    setIdle(true);
+  }, []);
+
+  useIdleReset(resetToWelcome);
+  useScreenWakeLock();
+
+  // A waiting update is applied only while the tablet is idle, never mid
+  // check-in.
+  useServiceWorkerUpdate(idle);
+
+  // Anything the visitor touches means somebody is using the tablet, so an
+  // update must wait. Cleared again by the idle reset above.
+  useEffect(() => {
+    const onInteract = () => setIdle(false);
+    window.addEventListener('pointerdown', onInteract, { passive: true });
+    return () => window.removeEventListener('pointerdown', onInteract);
+  }, []);
 
   useEffect(() => {
     void loadDirectory();
@@ -38,8 +71,10 @@ export default function KioskApp() {
   }, [loadDirectory]);
 
   return (
-    <AppTheme>
-      <VisitorPage />
-    </AppTheme>
+    <ErrorBoundary label="kiosk" autoReloadMs={8000}>
+      <AppTheme>
+        <VisitorPage key={sessionKey} />
+      </AppTheme>
+    </ErrorBoundary>
   );
 }
