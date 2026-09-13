@@ -96,11 +96,13 @@ async function provision(label) {
   console.log('');
   console.log(`    ${token}`);
   console.log('');
-  console.log('  On the tablet, open the kiosk URL, then in the browser console run:');
+  const kioskUrl = (process.env.KIOSK_URL ?? 'https://kiosk.example.com').replace(/\/+$/, '');
+  console.log('  On the tablet, open this link once. It registers the tablet and removes');
+  console.log('  the token from the address bar. Set KIOSK_URL to print your real domain.');
   console.log('');
-  console.log(`    localStorage.setItem('vms-kiosk-token:v1', '${token}')`);
+  console.log(`    ${kioskUrl}/#device-token=${token}`);
   console.log('');
-  console.log('  Then reload. Revoke this device with:');
+  console.log('  Then install it to the home screen. Revoke this device with:');
   console.log('');
   console.log(`    node scripts/provision-kiosk-device.mjs --revoke ${data.id}`);
   console.log('');

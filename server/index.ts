@@ -198,7 +198,8 @@ const server = createServer((req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  const target = process.env.APP_TARGET ?? process.env.VITE_APP_TARGET ?? 'all (development)';
+  // || rather than ??: an empty target means serve everything, and should say so.
+  const target = process.env.APP_TARGET || process.env.VITE_APP_TARGET || 'all (development)';
   console.log(`vms server on http://${HOST}:${PORT}  target=${target}  static=${STATIC_ROOT}`);
 });
 

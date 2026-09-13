@@ -1,33 +1,62 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Button, Result } from 'antd';
 import AppTheme from '../AppTheme';
 import ErrorBoundary from '../ErrorBoundary';
 import VisitorPage from '../../pages/VisitorPage';
+import { consumeProvisioningLink } from './deviceProvisioning';
 import { useKioskStore } from './kioskStore';
 import { useIdleReset, useScreenWakeLock } from './useIdleReset';
 import { useServiceWorkerUpdate } from './useServiceWorker';
 
+/*
+ * Runs once, when the kiosk bundle loads and before anything asks the server
+ * for data, so a tablet opened from its provisioning link is registered by the
+ * time the first request goes out.
+ */
+consumeProvisioningLink();
+
+/**
+ * Shown instead of the check-in screens when this tablet has no valid device
+ * token. Previously the kiosk showed an empty company picker with no
+ * explanation, which looks like a broken form rather than an unregistered
+ * device.
+ */
+function UnregisteredTablet({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div
+      className="floating-orbs"
+      style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    >
+      <Result
+        status="warning"
+        title={t('visitor.unregistered.title')}
+        subTitle={t('visitor.unregistered.body')}
+        extra={
+          <Button type="primary" size="large" onClick={onRetry}>
+            {t('visitor.unregistered.retry')}
+          </Button>
+        }
+      />
+    </div>
+  );
+}
+
 /**
  * The tablet.
  *
- * There is no router, no login page and no route that reaches one. A visitor
- * previously met a three-card role picker offering Front Desk and Admin
- * alongside Visitor, and the hidden exit gesture navigated to that same screen.
- * In this build those screens are not merely unreachable, they are not compiled
- * in: Rollup drops the staff branch in main.tsx because the target check folds
- * to a constant.
- *
- * It also fetches nothing at boot beyond the company picker. The previous shell
- * pulled every visitor ever recorded and every employee record onto the device.
+ * There is no router, no login page and no route that reaches one. It fetches
+ * nothing at boot beyond the company picker.
  */
 export default function KioskApp() {
   const loadDirectory = useKioskStore((s) => s.loadDirectory);
+  const directoryError = useKioskStore((s) => s.directoryError);
 
   /**
-   * Bumping this remounts the whole visitor tree.
-   *
-   * Clearing the form field by field would mean remembering every field, and
-   * the one that gets forgotten is the one holding an identity number. A
-   * remount cannot miss anything.
+   * Bumping this remounts the whole visitor tree. Clearing the form field by
+   * field would mean remembering every field, and the one that gets forgotten is
+   * the one holding an identity number. A remount cannot miss anything.
    */
   const [sessionKey, setSessionKey] = useState(0);
   const [idle, setIdle] = useState(true);
@@ -40,12 +69,9 @@ export default function KioskApp() {
   useIdleReset(resetToWelcome);
   useScreenWakeLock();
 
-  // A waiting update is applied only while the tablet is idle, never mid
-  // check-in.
+  // A waiting update is applied only while the tablet is idle, never mid check-in.
   useServiceWorkerUpdate(idle);
 
-  // Anything the visitor touches means somebody is using the tablet, so an
-  // update must wait. Cleared again by the idle reset above.
   useEffect(() => {
     const onInteract = () => setIdle(false);
     window.addEventListener('pointerdown', onInteract, { passive: true });
@@ -55,12 +81,9 @@ export default function KioskApp() {
   useEffect(() => {
     void loadDirectory();
 
-    // The tablet stays open for weeks. Refresh periodically so a company added
-    // during the day appears without someone having to reload the kiosk.
+    // The tablet stays open for weeks. Refresh periodically, and whenever it
+    // comes back online, so a company added during the day appears.
     const id = window.setInterval(() => void loadDirectory(), 10 * 60 * 1000);
-
-    // Also refresh when the tablet comes back online, so a device that spent the
-    // morning disconnected is not showing yesterday's list.
     const onOnline = () => void loadDirectory();
     window.addEventListener('online', onOnline);
 
@@ -73,7 +96,11 @@ export default function KioskApp() {
   return (
     <ErrorBoundary label="kiosk" autoReloadMs={8000}>
       <AppTheme>
-        <VisitorPage key={sessionKey} />
+        {directoryError === 'unauthorised_device' ? (
+          <UnregisteredTablet onRetry={() => void loadDirectory()} />
+        ) : (
+          <VisitorPage key={sessionKey} />
+        )}
       </AppTheme>
     </ErrorBoundary>
   );

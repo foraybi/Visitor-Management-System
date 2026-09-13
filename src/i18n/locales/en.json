@@ -96,6 +96,11 @@
       "unknown_company": "That company is no longer listed. Please choose another.",
       "no_active_visit": "No open visit found for that number.",
       "server_error": "Something went wrong. Your check-in was not recorded."
+    },
+    "unregistered": {
+      "title": "This tablet is not registered",
+      "body": "Ask the front desk to register it. Check-in is unavailable until then.",
+      "retry": "Try again"
     }
   },
   "frontdesk": {

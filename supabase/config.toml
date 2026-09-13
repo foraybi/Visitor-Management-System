@@ -34,7 +34,11 @@ additional_redirect_urls = ["http://localhost:8787"]
 enable_signup = false
 
 [auth.email]
-enable_signup = false
+# Despite its name, this switch turns the email provider itself on or off. With
+# it off, nobody can sign in with email and password at all. Public sign-up is
+# blocked by [auth] enable_signup = false above, and the admin API that creates
+# staff accounts is not affected by that.
+enable_signup = true
 # Admin-created accounts are confirmed at creation, so this only matters for
 # accounts made some other way. Off locally, since there is no mail server.
 enable_confirmations = false

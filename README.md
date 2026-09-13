@@ -37,9 +37,76 @@ bootstrap SQL.
 ```bash
 npm install
 cp .env.example .env      # fill in your Supabase details
-npm run dev:api           # terminal 1: the API, on :8787
-npm run dev               # terminal 2: the app, proxying /api to :8787
+npm run dev:all           # staff app, kiosk and API together
 ```
+
+## Testing every role locally
+
+This runs everything on your machine against a local Supabase in Docker, so
+test accounts and test data never touch the cloud project. Docker Desktop must
+be running.
+
+```bash
+npm run db:start       # first run downloads the images and takes a few minutes
+npm run db:env         # writes .env.local so everything uses the local database
+npm run seed:local     # test accounts, sample data and a test tablet
+npm run smoke:roles    # automated permission check for every role
+npm run dev:all        # staff app on :5173, kiosk on :5174, API on :8787
+```
+
+| Role | Open | Sign in with |
+|---|---|---|
+| Super admin | http://localhost:5173 | `superadmin@vms.test` / `vms-test-1234` |
+| Admin | http://localhost:5173 | `admin@vms.test` / `vms-test-1234` |
+| Front desk | http://localhost:5173 | `frontdesk@vms.test` / `vms-test-1234` |
+| Visitor | the kiosk link printed by `seed:local` | no sign-in; the link registers the browser as a tablet |
+
+The three staff roles share one address, and a browser keeps one sign-in per
+address. Sign out between roles, or give each role its own browser profile.
+The credentials and the kiosk link are also saved in `test-accounts.local`.
+
+`smoke:roles` signs in as each account and checks what the database actually
+allows, which the screens alone cannot show. Then click through these by hand.
+
+**Super admin**
+1. The Staff accounts tab offers a role picker. Create an admin.
+2. Your own row has no remove button.
+3. Upload a document logo and an employee photo. Both must display.
+
+**Admin**
+1. Staff accounts lists front desk accounts only, with no role picker.
+2. Create a front desk account and sign in as it straight away in another
+   browser profile. No verification email is involved.
+3. Remove that account. It can no longer sign in.
+
+**Front desk**
+1. Signing in lands on the front desk screen, and visiting `/admin` sends you
+   back.
+2. The visitors table shows the seeded visits, and Khalid Alharbi is inside.
+3. Export the table as a PDF with the app in Arabic. The Arabic text must render.
+
+**Visitor, at the kiosk**
+1. Open the kiosk link, tap to begin, and check in as a visitor. You get a
+   four-digit code.
+2. Keep the front desk screen open alongside. The new visit appears without a
+   reload.
+3. Check out with the code. Checking out again with the same code is refused.
+4. Check in as an employee with passport `X1234567`. That is James Carter.
+5. The inactive employee `1000000004` is refused.
+6. Start a check-in, type an ID number, and wait ninety seconds. The screen
+   returns to the welcome state with the form cleared.
+7. In developer tools, set the network to Offline and try to check in. You get
+   an error message and no ID card.
+
+Useful while testing:
+
+| Command | What it does |
+|---|---|
+| `npm run db:status` | Local URLs, including Supabase Studio for browsing tables |
+| `npm run db:reset` | Rebuild the database from the migrations, then seed again |
+| `npm run db:stop` | Stop the local database |
+
+Delete `.env.local` to point the app back at the cloud project in `.env`.
 
 | Script | What it does |
 |---|---|

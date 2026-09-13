@@ -104,11 +104,12 @@ export default defineConfig(() => {
 
   return {
     plugins: [react(), ...(target === 'kiosk' ? [kioskPwa()] : [])],
+    cacheDir: `node_modules/.vite-${target}`,
     server: {
       host: true,
       // `npm run dev:api` serves the same handlers Vercel runs, so creating a
       // staff account or checking in works in development too.
-      proxy: { '/api': 'http://localhost:8787' },
+      proxy: { '/api': `http://localhost:${process.env.API_PORT ?? '8787'}` },
     },
     build: {
       // Never ship source maps to production; the staff app talks to Supabase

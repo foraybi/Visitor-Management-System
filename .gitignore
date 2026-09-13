@@ -30,3 +30,8 @@ dist-ssr
 
 # Self-hosted server bundle
 dist-server
+.env.local.bak
+
+# Supabase CLI local state
+supabase/.temp
+supabase/.branches
