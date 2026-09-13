@@ -110,12 +110,30 @@ for (const service of services) {
 process.on('SIGINT', () => stopAll(0));
 process.on('SIGTERM', () => stopAll(0));
 
-console.log(`
-  Staff app (super admin, admin, front desk)   http://localhost:${STAFF_PORT}
-  Kiosk (visitor)                              http://localhost:${KIOSK_PORT}
-  API                                          http://localhost:${API_PORT}
+// This computer's address on the local network, so a tablet on the same Wi-Fi
+// can open the apps. Vite already listens on every interface (server.host).
+const { networkInterfaces } = await import('node:os');
+const lan = Object.values(networkInterfaces())
+  .flat()
+  .find((address) => address && address.family === 'IPv4' && !address.internal)?.address;
 
-  First time? Register this browser as a test tablet with the link printed by
-  npm run seed:local, or saved in ./test-accounts.local. If you moved the kiosk
-  port, change the port in that link to match.
+console.log(`
+  On this computer
+    Staff app (super admin, admin, front desk)   http://localhost:${STAFF_PORT}
+    Kiosk (visitor)                              http://localhost:${KIOSK_PORT}
+    API                                          http://localhost:${API_PORT}
+${
+  lan
+    ? `
+  On a tablet or phone on the same Wi-Fi
+    Kiosk                                        http://${lan}:${KIOSK_PORT}
+    Staff app                                    http://${lan}:${STAFF_PORT}
+`
+    : `
+  No network address found, so only this computer can open the apps.
+`
+}
+  First time on a device? Register it as a test tablet by opening the kiosk
+  link saved in ./test-accounts.local: kioskLink on this computer, kioskLinkLan
+  on a tablet. If you moved the kiosk port, change the port in that link.
 `);

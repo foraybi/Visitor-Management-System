@@ -1,28 +1,30 @@
 #!/usr/bin/env node
 /**
- * Fill a local database with everything needed to test every role by hand.
+ * Fill a database with everything needed to test every role by hand.
+ *
+ *   npm run seed:cloud     your Supabase cloud project, from .env
+ *   npm run seed:local     a local Supabase, from .env.local
  *
  * Creates, or refreshes on a re-run:
- *   - a super admin (only if the database has none), an admin and a front desk
- *     account, all confirmed so they sign in immediately
+ *   - an admin and a front desk test account, confirmed so they sign in at once,
+ *     plus a super admin only if the database has none
  *   - three floors, three companies, and four employees covering a national id,
  *     an iqama, a passport holder and an inactive employee
  *   - three visits: an active visitor, an employee inside the building, and one
  *     from yesterday that has already left
- *   - a test tablet, with a link that registers your browser as that tablet
+ *   - a test tablet, with links that register a browser as that tablet, both on
+ *     this computer and on a tablet on the same Wi-Fi
  *
- * Writes the credentials to ./test-accounts.local (gitignored) so the smoke
- * test and you can read them back.
+ * Writes the credentials to ./test-accounts.local (gitignored).
  *
- *   npm run seed:local
- *
- * Refuses to run against anything but a local server unless given
- * --allow-remote, because test accounts with known passwords do not belong in a
- * production project.
+ * On a cloud project this is test data in your real database. Remove it with
+ * npm run flush-data before real visitors use the system. Your own super admin
+ * account is never touched.
  */
 
 import { createHash, randomBytes } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
+import { networkInterfaces } from 'node:os';
 import { createClient } from '@supabase/supabase-js';
 
 const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
@@ -32,7 +34,7 @@ const kioskUrl = (process.env.KIOSK_URL ?? 'http://localhost:5174').replace(/\/+
 const allowRemote = process.argv.includes('--allow-remote');
 
 if (!url || !key) {
-  console.error('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY first (npm run db:env writes them to .env.local).');
+  console.error('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env first. Never give the service key a VITE_ prefix.');
   process.exit(1);
 }
 
@@ -40,12 +42,12 @@ const host = new URL(url).hostname;
 const isLocal = ['localhost', '127.0.0.1', '::1', '[::1]', '0.0.0.0'].includes(host) || host.endsWith('.local');
 
 if (!isLocal && !allowRemote) {
-  console.error(`Refusing to create test accounts on ${host}. This is meant for a local database.`);
-  console.error('If you really mean to seed a remote project, pass --allow-remote.');
+  console.error(`${host} is not a local database.`);
+  console.error('To seed your cloud project for testing, run npm run seed:cloud.');
   process.exit(1);
 }
 
-// A memorable password is fine on a database that only exists on your machine.
+// A memorable password is fine on a database that only exists on this computer.
 const password = isLocal ? 'vms-test-1234' : randomBytes(12).toString('base64url');
 
 const supabase = createClient(url, key, {
@@ -53,20 +55,29 @@ const supabase = createClient(url, key, {
 });
 
 const SEED_MARKER = 'seed@vms.test';
-const DEVICE_LABEL = 'Local test tablet';
+const DEVICE_LABEL = 'Test tablet';
 
 function fail(step, error) {
   throw new Error(`${step}: ${error.message ?? error}`);
 }
 
 function dateInRiyadh(offsetDays = 0) {
-  const d = new Date(Date.now() + offsetDays * 86_400_000);
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Riyadh',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(d);
+  }).format(new Date(Date.now() + offsetDays * 86_400_000));
+}
+
+/** This computer's address on the local network, for opening the app from a tablet. */
+function lanAddress() {
+  for (const addresses of Object.values(networkInterfaces())) {
+    for (const address of addresses ?? []) {
+      if (address.family === 'IPv4' && !address.internal) return address.address;
+    }
+  }
+  return null;
 }
 
 async function findUser(email) {
@@ -212,7 +223,10 @@ async function main() {
   if (visitError) fail('inserting visits', visitError);
 
   // ── Test tablet ───────────────────────────────────────────────────────────
-  await supabase.from('kiosk_devices').update({ active: false }).eq('label', DEVICE_LABEL).eq('active', true);
+  // Earlier test tablets are revoked, so only the newest link works.
+  for (const label of [DEVICE_LABEL, 'Local test tablet']) {
+    await supabase.from('kiosk_devices').update({ active: false }).eq('label', label).eq('active', true);
+  }
   const token = randomBytes(32).toString('hex');
   const { error: deviceError } = await supabase
     .from('kiosk_devices')
@@ -220,28 +234,54 @@ async function main() {
   if (deviceError) fail('registering the test tablet', deviceError);
 
   const kioskLink = `${kioskUrl}/#device-token=${token}`;
+  const lan = lanAddress();
+  const kioskLinkLan = lan ? kioskLink.replace(/\/\/(localhost|127\.0\.0\.1)(?=[:/])/, `//${lan}`) : null;
+  const staffUrlLan = lan ? staffUrl.replace(/\/\/(localhost|127\.0\.0\.1)(?=[:/])/, `//${lan}`) : null;
 
   writeFileSync(
     'test-accounts.local',
-    `${JSON.stringify({ server: url, staffUrl, kioskLink, deviceToken: token, accounts: { superadmin, admin, frontdesk } }, null, 2)}\n`,
+    `${JSON.stringify(
+      {
+        server: url,
+        staffUrl,
+        staffUrlLan,
+        kioskLink,
+        kioskLinkLan,
+        deviceToken: token,
+        accounts: { superadmin, admin, frontdesk },
+      },
+      null,
+      2,
+    )}\n`,
     { mode: 0o600 },
   );
 
   // ── Summary ───────────────────────────────────────────────────────────────
   const line = (role, account) =>
-    console.log(`  ${role.padEnd(12)} ${account.email.padEnd(26)} ${account.password ?? '(existing account, your own password)'}`);
+    console.log(`  ${role.padEnd(12)} ${account.email.padEnd(26)} ${account.password ?? '(your own account and password)'}`);
 
-  console.log('Staff app:', staffUrl);
+  console.log(`Staff app: ${staffUrl}${staffUrlLan ? `   from another device: ${staffUrlLan}` : ''}`);
   line('super admin', superadmin);
   line('admin', admin);
   line('front desk', frontdesk);
-  console.log('\nKiosk: open this link once to register this browser as a test tablet:');
+
+  console.log('\nKiosk, on this computer: open once to register this browser as a test tablet');
   console.log(`  ${kioskLink}`);
+  if (kioskLinkLan) {
+    console.log('\nKiosk, on a tablet on the same Wi-Fi: open this in the tablet\'s browser');
+    console.log(`  ${kioskLinkLan}`);
+  }
+
   console.log('\nEmployees to try at the kiosk, as an employee check-in:');
   console.log('  1000000001  national id   Khalid Alharbi    (already inside)');
   console.log('  2000000002  iqama         Noura Alqahtani');
   console.log('  X1234567    passport      James Carter      (the passport case that used to fail)');
   console.log('  1000000004  national id   inactive, must be refused');
+
+  if (!isLocal) {
+    console.log('\nThis is test data in your real project. Before real visitors use it, run:');
+    console.log('  npm run flush-data');
+  }
   console.log('\nSaved to ./test-accounts.local (gitignored).\n');
 }
 

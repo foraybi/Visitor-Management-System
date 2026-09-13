@@ -40,82 +40,128 @@ cp .env.example .env      # fill in your Supabase details
 npm run dev:all           # staff app, kiosk and API together
 ```
 
-## Testing every role locally
+## Testing before you go live
 
-This runs everything on your machine against a local Supabase in Docker, so
-test accounts and test data never touch the cloud project. Docker Desktop must
-be running.
+Test on your real Supabase cloud project, with the app running on your computer.
+Nothing is deployed until you choose to.
+
+**1. Finish setting up the cloud project.** This lists exactly what is left, and
+changes nothing:
 
 ```bash
-npm run db:start       # first run downloads the images and takes a few minutes
-npm run db:env         # writes .env.local so everything uses the local database
-npm run seed:local     # test accounts, sample data and a test tablet
-npm run smoke:roles    # automated permission check for every role
-npm run dev:all        # staff app on :5173, kiosk on :5174, API on :8787
+npm run check:cloud
+```
+
+Run it again after each fix until it says Ready. The usual items:
+
+- Run `supabase/migrations/20260913000001_admin_access_and_grants.sql` in the SQL
+  editor. Without it, the super admin script below is refused.
+- Put your password into `supabase/scripts/bootstrap-superadmin.sql` and run it.
+- Turn off "Allow new users to sign up" under Authentication, Sign In / Providers.
+- Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to `.env`. The service key is
+  under Project Settings, API. Never give it a `VITE_` prefix.
+- Remove any `VITE_APP_TARGET` line from `.env`.
+
+**2. Add test data and check permissions.**
+
+```bash
+npm run seed:cloud     # test admin and front desk accounts, sample data, a test tablet
+npm run smoke:cloud    # checks what each role can and cannot do
+```
+
+The seed never touches your own super admin account. Test passwords are random,
+printed once, and saved in `test-accounts.local`.
+
+**3. Run the apps.**
+
+```bash
+npm run dev:all
 ```
 
 | Role | Open | Sign in with |
 |---|---|---|
-| Super admin | http://localhost:5173 | `superadmin@vms.test` / `vms-test-1234` |
-| Admin | http://localhost:5173 | `admin@vms.test` / `vms-test-1234` |
-| Front desk | http://localhost:5173 | `frontdesk@vms.test` / `vms-test-1234` |
-| Visitor | the kiosk link printed by `seed:local` | no sign-in; the link registers the browser as a tablet |
+| Super admin | http://localhost:5173 | your own account |
+| Admin | http://localhost:5173 | `admin@vms.test`, password printed by the seed |
+| Front desk | http://localhost:5173 | `frontdesk@vms.test`, password printed by the seed |
+| Visitor | `kioskLink` in `test-accounts.local` | no sign-in |
 
-The three staff roles share one address, and a browser keeps one sign-in per
-address. Sign out between roles, or give each role its own browser profile.
-The credentials and the kiosk link are also saved in `test-accounts.local`.
+The staff roles share one address, and a browser keeps one sign-in per address.
+Sign out between roles, or use a separate browser profile for each.
 
-`smoke:roles` signs in as each account and checks what the database actually
-allows, which the screens alone cannot show. Then click through these by hand.
+**4. Remove the test data before real visitors arrive.**
+
+```bash
+npm run flush-data
+```
+
+This deletes the sample data, the test accounts and the test tablet, and keeps
+your super admin.
+
+### What to try as each role
 
 **Super admin**
-1. The Staff accounts tab offers a role picker. Create an admin.
+1. Staff accounts offers a role picker. Create an admin.
 2. Your own row has no remove button.
 3. Upload a document logo and an employee photo. Both must display.
 
 **Admin**
 1. Staff accounts lists front desk accounts only, with no role picker.
-2. Create a front desk account and sign in as it straight away in another
-   browser profile. No verification email is involved.
+2. Create a front desk account and sign in as it straight away. No verification
+   email is involved.
 3. Remove that account. It can no longer sign in.
 
 **Front desk**
-1. Signing in lands on the front desk screen, and visiting `/admin` sends you
-   back.
-2. The visitors table shows the seeded visits, and Khalid Alharbi is inside.
-3. Export the table as a PDF with the app in Arabic. The Arabic text must render.
+1. Signing in lands on the front desk screen, and visiting `/admin` sends you back.
+2. The visitors table shows the sample visits, and Khalid Alharbi is inside.
+3. Export a PDF with the app in Arabic. The Arabic text must render.
 
 **Visitor, at the kiosk**
-1. Open the kiosk link, tap to begin, and check in as a visitor. You get a
-   four-digit code.
-2. Keep the front desk screen open alongside. The new visit appears without a
+1. Tap to begin and check in as a visitor. You get a four-digit code.
+2. With the front desk screen open alongside, the new visit appears without a
    reload.
 3. Check out with the code. Checking out again with the same code is refused.
 4. Check in as an employee with passport `X1234567`. That is James Carter.
 5. The inactive employee `1000000004` is refused.
-6. Start a check-in, type an ID number, and wait ninety seconds. The screen
-   returns to the welcome state with the form cleared.
-7. In developer tools, set the network to Offline and try to check in. You get
-   an error message and no ID card.
+6. Start a check-in, type an ID number and wait ninety seconds. The screen returns
+   to the welcome state with the form cleared.
 
-Useful while testing:
+### Testing the kiosk on a tablet
 
-| Command | What it does |
-|---|---|
-| `npm run db:status` | Local URLs, including Supabase Studio for browsing tables |
-| `npm run db:reset` | Rebuild the database from the migrations, then seed again |
-| `npm run db:stop` | Stop the local database |
+The computer runs the app, and the tablet opens it over Wi-Fi.
 
-Delete `.env.local` to point the app back at the cloud project in `.env`.
+1. Put the computer and the tablet on the same Wi-Fi network.
+2. Run `npm run dev:all`. It prints the tablet address, such as
+   `http://10.198.1.77:5174`.
+3. On the tablet, open `kioskLinkLan` from `test-accounts.local` once. That
+   registers the tablet. Opening the plain address before that shows "This tablet
+   is not registered".
+4. Tap to begin and run through the visitor list above.
 
-| Script | What it does |
-|---|---|
-| `npm run dev` / `npm run dev:api` | App and API in development |
-| `npm run build:kiosk` / `build:staff` | Production build of one app |
-| `npm run verify:kiosk` / `verify:staff` | Gate a build for leaked keys and size |
-| `npm run build:server` / `npm start` | Self-hosted server, see below |
-| `npm run flush-data` | Delete all application data, see below |
-| `npm run typecheck` / `lint` / `test:run` | Checks |
+To lock an iPad to the kiosk, turn on Settings, Accessibility, Guided Access. Then
+triple-click the top or side button while the kiosk is open. On Android, use
+screen pinning.
+
+**On an iPad, test in Safari itself, not from a home-screen icon.** A web app
+added to the iPad home screen keeps its own storage, separate from Safari, so it
+does not see the registration. Android tablets share storage between Chrome and
+the installed app, so the real kiosk tablets are not affected.
+
+**Plain Wi-Fi addresses cannot test everything.** Browsers allow the offline
+shell, installing the app and keeping the screen awake only over HTTPS. Test
+those three on a Vercel preview deployment, which is HTTPS and is not your
+production site.
+
+### Testing against a local database instead
+
+For the later move to a self-hosted database, the same checks run against a local
+Supabase in Docker:
+
+```bash
+npm run db:start && npm run db:env && npm run seed:local && npm run smoke:roles
+```
+
+`npm run db:stop` stops it. Delete `.env.local` afterwards, or every command
+keeps using the local database.
 
 ## Setting up a database
 
