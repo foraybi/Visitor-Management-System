@@ -1,18 +1,15 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { json, kioskHandler, serviceClient, todayInRiyadh } from '../_lib/kiosk';
+import { json, readJson } from '../_lib/http';
+import { kioskHandler, todayInRiyadh } from '../_lib/kiosk';
+import { serviceClient } from '../_lib/supabaseAdmin';
 import { parseIdentityNumber, type IdentityType } from '../../src/domain/identity/identity';
 
 /**
  * Record a check-in and return the visitor-facing code.
  *
- * The code is allocated here rather than in the browser. The browser counted
- * today's rows and padded to four digits, which restarted at 0001 each morning
- * against a TEXT PRIMARY KEY, so every visit from the second day onward collided
- * and was silently dropped. Allocating server-side also removes the race between
- * two tablets checking in at the same moment.
- *
- * There is no insert policy for any signed-in user, so this endpoint is the only
- * way a visit is created.
+ * The code is allocated by Postgres from a per-day counter. The browser used to
+ * count today's rows, which restarted at 0001 each morning against a primary key
+ * and silently lost every visit from the second day onward. This endpoint is the
+ * only way a visit is created: no signed-in user has an insert policy.
  */
 
 interface CheckInBody {
@@ -35,42 +32,30 @@ const MAX_SIGNATURE_BYTES = 512 * 1024;
 function asString(value: unknown, max: number): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
-  if (trimmed.length === 0 || trimmed.length > max) return null;
-  return trimmed;
+  return trimmed.length === 0 || trimmed.length > max ? null : trimmed;
 }
 
-export default kioskHandler('POST', async (req: VercelRequest, res: VercelResponse) => {
-  const body = (req.body ?? {}) as CheckInBody;
+export const handleCheckIn = kioskHandler(async (request) => {
+  const body = await readJson<CheckInBody>(request);
+  if (!body) return json(400, { error: 'invalid_request' });
 
   const visitorType = body.visitorType === 'employee' ? 'employee' : 'visitor';
   const companyId = asString(body.visitedCompanyId, 64);
   const floor = typeof body.floor === 'number' && Number.isInteger(body.floor) ? body.floor : null;
-
-  if (!companyId || floor === null) {
-    json(res, 400, { error: 'invalid_request' });
-    return;
-  }
+  if (!companyId || floor === null) return json(400, { error: 'invalid_request' });
 
   const identity = parseIdentityNumber(
     body.nationalityType as IdentityType,
     typeof body.nationalityIdNumber === 'string' ? body.nationalityIdNumber : '',
   );
-  if (!identity.ok) {
-    json(res, 400, { error: 'invalid_identity', reason: identity.reason });
-    return;
-  }
+  if (!identity.ok) return json(400, { error: 'invalid_identity', reason: identity.reason });
 
   const signature = typeof body.signatureDataUrl === 'string' ? body.signatureDataUrl : '';
-  if (signature.length > MAX_SIGNATURE_BYTES) {
-    json(res, 413, { error: 'signature_too_large' });
-    return;
-  }
+  if (signature.length > MAX_SIGNATURE_BYTES) return json(413, { error: 'signature_too_large' });
 
   const supabase = serviceClient();
 
-  // The company must exist and the floor must be its floor. Trusting the
-  // tablet's floor would let a mismatched pair into the log, and the visitor
-  // badge is what the front desk relies on to know where someone went.
+  // The floor comes from the company record, never from the tablet.
   const { data: company, error: companyError } = await supabase
     .from('companies')
     .select('id, floor')
@@ -79,24 +64,18 @@ export default kioskHandler('POST', async (req: VercelRequest, res: VercelRespon
 
   if (companyError) {
     console.error('company check failed:', companyError);
-    json(res, 502, { error: 'check_in_unavailable' });
-    return;
+    return json(502, { error: 'check_in_unavailable' });
   }
-  if (!company) {
-    json(res, 400, { error: 'unknown_company' });
-    return;
-  }
+  if (!company) return json(400, { error: 'unknown_company' });
 
   const date = todayInRiyadh();
-  const now = new Date().toISOString();
 
   const { data: code, error: codeError } = await supabase.rpc('allocate_visit_code', {
     p_date: date,
   });
   if (codeError || typeof code !== 'string') {
     console.error('visit code allocation failed:', codeError);
-    json(res, 502, { error: 'check_in_unavailable' });
-    return;
+    return json(502, { error: 'check_in_unavailable' });
   }
 
   const { error: insertError } = await supabase.from('visitors').insert({
@@ -112,19 +91,20 @@ export default kioskHandler('POST', async (req: VercelRequest, res: VercelRespon
     visited_company_id: company.id,
     floor: company.floor,
     signature_data_url: signature,
-    entry_time: now,
+    entry_time: new Date().toISOString(),
     exit_time: null,
     status: 'active',
     date,
   });
 
   if (insertError) {
-    // The visitor is told, and no id card is shown. The old code logged this to
-    // a console nobody was reading and showed a card regardless.
     console.error('check-in insert failed:', insertError);
-    json(res, 502, { error: 'check_in_failed' });
-    return;
+    return json(502, { error: 'check_in_failed' });
   }
 
-  json(res, 201, { visitCode: code, floor: company.floor });
+  return json(201, { visitCode: code, floor: company.floor });
 });
+
+export function POST(request: Request): Promise<Response> {
+  return handleCheckIn(request);
+}

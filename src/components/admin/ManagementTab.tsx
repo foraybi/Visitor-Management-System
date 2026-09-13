@@ -44,7 +44,16 @@ import { generateEmployeeNumber } from '../../utils/idGenerator';
 import { countries } from '../../utils/countryData';
 import { formatTimeFromISO } from '../../utils/timeUtils';
 import type { Company, Employee, NationalityType, StaffProfile } from '../../types';
-import { supabase, supabaseCreator, uploadFile } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
+import { uploadToStorage, useStorageUrl } from '../../data/storage';
+import {
+  createStaffAccount,
+  deleteStaffAccount,
+  staffAccountErrorKey,
+  type AssignableRole,
+} from '../../data/staffAccounts';
+import { can, canAdminister } from '../../domain/access/access';
+import { useAuthStore } from '../../store/authStore';
 
 const { Title } = Typography;
 
@@ -134,7 +143,8 @@ export default function ManagementTab() {
     if (photoFile) {
       try {
         const ext = photoFile.name.split('.').pop() ?? 'jpg';
-        resolvedPhotoUrl = await uploadFile('employee-photos', `${crypto.randomUUID()}.${ext}`, photoFile);
+        // Stores the object path, not a URL, so the row survives a server move.
+        resolvedPhotoUrl = await uploadToStorage('employee-photos', `${crypto.randomUUID()}.${ext}`, photoFile);
       } catch {
         message.error('Failed to upload photo — employee saved without photo.');
         resolvedPhotoUrl = '';
@@ -399,7 +409,15 @@ export default function ManagementTab() {
   ];
 
   // ─── Photo upload ───
-  const photoPreviewSrc = photoFile ? URL.createObjectURL(photoFile) : photoDataUrl;
+  // A newly picked file previews from memory, and the object URL is released
+  // when it changes. A saved photo resolves to a signed URL, because the
+  // employee-photos bucket is private and refuses a plain public URL.
+  const localPhotoSrc = useMemo(() => (photoFile ? URL.createObjectURL(photoFile) : ''), [photoFile]);
+  useEffect(() => () => {
+    if (localPhotoSrc) URL.revokeObjectURL(localPhotoSrc);
+  }, [localPhotoSrc]);
+  const storedPhotoSrc = useStorageUrl('employee-photos', photoFile ? '' : photoDataUrl);
+  const photoPreviewSrc = localPhotoSrc || storedPhotoSrc;
 
   const photoUploadProps: UploadProps = {
     accept: 'image/*',
@@ -434,7 +452,8 @@ export default function ManagementTab() {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
-      .eq('role', 'frontdesk')
+      // No role filter: Row Level Security already limits an admin to front desk
+      // accounts and its own row, and lets a super admin see everyone.
       .order('created_at', { ascending: false });
     if (error) {
       console.error(error);
@@ -467,37 +486,39 @@ export default function ManagementTab() {
     };
   }, [loadStaff]);
 
-  const handleCreateStaff = async (values: { email: string; password: string; fullName: string }) => {
+  const currentRole = useAuthStore(s => s.currentRole);
+  const currentUserId = useAuthStore(s => s.currentUserId);
+  const canCreateAdmins = can(currentRole, 'staff.createAdmin');
+
+  /**
+   * Create a staff account on the server.
+   *
+   * The server uses the admin API, so the account is confirmed at creation and
+   * signs in straight away with no verification email, and public sign-up can
+   * stay switched off. It checks the caller's role itself: an admin creates
+   * front desk accounts, and only a super admin creates admins.
+   */
+  const handleCreateStaff = async (values: {
+    email: string;
+    password: string;
+    fullName: string;
+    role?: AssignableRole;
+  }) => {
     setStaffSubmitting(true);
     setStaffError('');
-    // Created with the secondary client so this does not replace the admin's own
-    // session. Note what is NOT passed: the role. It used to be written into
-    // user_metadata, which is the claim the user themselves can edit, so the
-    // account could promote itself from the browser console. The role lives in
-    // the profiles row below, which only a superadmin may change.
-    const { data, error } = await supabaseCreator.auth.signUp({
+    const role: AssignableRole = canCreateAdmins && values.role === 'admin' ? 'admin' : 'frontdesk';
+    const result = await createStaffAccount({
+      fullName: values.fullName,
       email: values.email,
       password: values.password,
-      options: { data: { full_name: values.fullName } },
-    });
-    if (error || !data.user) {
-      setStaffError(error?.message ?? 'Failed to create account.');
-      setStaffSubmitting(false);
-      return;
-    }
-    // Insert into profiles table so the admin can list/manage them
-    const { error: profileError } = await supabase.from('profiles').insert({
-      id: data.user.id,
-      email: values.email,
-      full_name: values.fullName || null,
-      role: 'frontdesk',
+      role,
     });
     setStaffSubmitting(false);
-    if (profileError) {
-      setStaffError(profileError.message);
+    if (!result.ok) {
+      setStaffError(t(staffAccountErrorKey(result.error)));
       return;
     }
-    message.success(`Front desk account created for ${values.email}`);
+    message.success(t('staff.createdMessage', { email: values.email }));
     setStaffModalOpen(false);
     staffForm.resetFields();
     setStaffLoading(true);
@@ -505,37 +526,44 @@ export default function ManagementTab() {
   };
 
   /**
-   * Remove a front desk account.
-   *
-   * Deleting the profile row now genuinely revokes access. The app reads the
-   * role from this table, so a sign-in with no profile row is refused and the
-   * session is dropped. Previously the role came from the JWT, which meant a
-   * "removed" user kept working indefinitely, as the old confirmation text
-   * admitted.
+   * Remove a staff account. The server deletes the auth user, which cascades to
+   * the profile row, so the account can no longer sign in anywhere.
    */
   const handleDeleteStaff = async (id: string) => {
-    const { error } = await supabase.from('profiles').delete().eq('id', id);
-    if (error) { message.error('Failed to remove account.'); return; }
-    message.success('Account removed. Their access is revoked.');
+    const result = await deleteStaffAccount(id);
+    if (!result.ok) {
+      message.error(t(staffAccountErrorKey(result.error)));
+      return;
+    }
+    message.success(t('staff.removed'));
     setStaffList(prev => prev.filter(s => s.id !== id));
+  };
+
+  const roleTag: Record<StaffProfile['role'], { color: string; label: string }> = {
+    superadmin: { color: 'magenta', label: t('staff.roles.superadmin') },
+    admin: { color: 'geekblue', label: t('staff.roles.admin') },
+    frontdesk: { color: 'cyan', label: t('staff.roles.frontdesk') },
   };
 
   const staffColumns: ColumnsType<StaffProfile> = [
     {
-      title: 'Name',
+      title: t('staff.name'),
       dataIndex: 'fullName',
       key: 'fullName',
       render: v => v ?? <span style={{ color: '#bfbfbf' }}>—</span>,
     },
-    { title: 'Email', dataIndex: 'email', key: 'email' },
+    { title: t('staff.email'), dataIndex: 'email', key: 'email' },
     {
-      title: 'Role',
+      title: t('staff.role'),
       dataIndex: 'role',
       key: 'role',
-      render: () => <Tag color="cyan">Front Desk</Tag>,
+      render: (role: StaffProfile['role']) => {
+        const tag = roleTag[role] ?? roleTag.frontdesk;
+        return <Tag color={tag.color}>{tag.label}</Tag>;
+      },
     },
     {
-      title: 'Created',
+      title: t('staff.createdAt'),
       dataIndex: 'createdAt',
       key: 'createdAt',
       render: v => new Date(v).toLocaleDateString(),
@@ -543,17 +571,22 @@ export default function ManagementTab() {
     {
       title: t('table.actions'),
       key: 'actions',
-      render: (_, record) => (
-        <Popconfirm
-          title="Remove this front desk account?"
-          description="Access is revoked immediately: the role is read from this row, so the account can no longer sign in to the app."
-          onConfirm={() => handleDeleteStaff(record.id)}
-          okText="Remove"
-          okButtonProps={{ danger: true }}
-        >
-          <Button size="small" danger icon={<DeleteOutlined />} />
-        </Popconfirm>
-      ),
+      render: (_, record) => {
+        // The server enforces this too. Hiding the button just avoids offering
+        // an action that will be refused.
+        if (record.id === currentUserId || !canAdminister(currentRole, record.role)) return null;
+        return (
+          <Popconfirm
+            title={t('staff.removeConfirmTitle')}
+            description={t('staff.removeConfirmBody')}
+            onConfirm={() => handleDeleteStaff(record.id)}
+            okText={t('staff.remove')}
+            okButtonProps={{ danger: true }}
+          >
+            <Button size="small" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        );
+      },
     },
   ];
 
@@ -615,15 +648,15 @@ export default function ManagementTab() {
             label: (
               <span>
                 <TeamOutlined style={{ marginInlineEnd: 6 }} />
-                Staff Accounts
+                {t('staff.tab')}
               </span>
             ),
             children: (
               <Card
-                title={<Title level={4} style={{ margin: 0 }}>Front Desk Accounts</Title>}
+                title={<Title level={4} style={{ margin: 0 }}>{t('staff.title')}</Title>}
                 extra={
                   <Button type="primary" icon={<PlusOutlined />} onClick={() => { setStaffModalOpen(true); setStaffError(''); }}>
-                    Add Front Desk User
+                    {t('staff.add')}
                   </Button>
                 }
               >
@@ -680,7 +713,7 @@ export default function ManagementTab() {
       {/* Staff Account Modal */}
       <Modal
         open={staffModalOpen}
-        title="Create Front Desk Account"
+        title={t('staff.createTitle')}
         onCancel={() => { setStaffModalOpen(false); staffForm.resetFields(); setStaffError(''); }}
         footer={null}
         centered
@@ -697,24 +730,36 @@ export default function ManagementTab() {
           requiredMark={false}
           style={{ marginTop: 16 }}
         >
+          {canCreateAdmins && (
+            <Form.Item label={t('staff.role')} name="role" initialValue="frontdesk">
+              <Select
+                size="large"
+                options={[
+                  { value: 'frontdesk', label: t('staff.roles.frontdesk') },
+                  { value: 'admin', label: t('staff.roles.admin') },
+                ]}
+              />
+            </Form.Item>
+          )}
           <Form.Item
-            label="Full Name"
+            label={t('staff.name')}
             name="fullName"
-            rules={[{ required: true, message: 'Enter the staff member\'s name' }]}
+            rules={[{ required: true, message: t('staff.nameRule') }]}
           >
             <Input size="large" placeholder="Ahmed Al-Rashidi" />
           </Form.Item>
           <Form.Item
-            label="Email"
+            label={t('staff.email')}
             name="email"
-            rules={[{ required: true, type: 'email', message: 'Enter a valid email' }]}
+            rules={[{ required: true, type: 'email', message: t('staff.emailRule') }]}
           >
             <Input size="large" type="email" placeholder="staff@company.com" />
           </Form.Item>
           <Form.Item
-            label="Password"
+            label={t('staff.password')}
             name="password"
-            rules={[{ required: true, min: 8, message: 'Password must be at least 8 characters' }]}
+            extra={t('staff.noVerificationNeeded')}
+            rules={[{ required: true, min: 8, max: 72, message: t('staff.passwordRule') }]}
           >
             <Input.Password size="large" placeholder="Min. 8 characters" />
           </Form.Item>
@@ -724,7 +769,7 @@ export default function ManagementTab() {
                 {t('common.cancel')}
               </Button>
               <Button type="primary" htmlType="submit" loading={staffSubmitting}>
-                Create Account
+                {t('staff.create')}
               </Button>
             </Space>
           </Form.Item>

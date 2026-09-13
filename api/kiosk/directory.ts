@@ -1,19 +1,16 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { json, kioskHandler, serviceClient } from '../_lib/kiosk';
+import { json } from '../_lib/http';
+import { kioskHandler } from '../_lib/kiosk';
+import { serviceClient } from '../_lib/supabaseAdmin';
 
 /**
- * The company and floor picker.
+ * The company and floor picker, plus which check-in fields to show.
  *
- * Replaces the kiosk's calls to fetchCompanies and fetchFloors, which pulled the
- * entire employee directory into the tablet's memory: names, phones, emails,
- * identity numbers, gender, hire dates, photographs and notes. The picker only
- * ever rendered a company name and a floor, so that is all this returns.
+ * Returns only what the picker renders. The kiosk used to load the entire
+ * employee directory onto the tablet to draw this list.
  */
-export default kioskHandler('GET', async (_req: VercelRequest, res: VercelResponse) => {
+export const handleDirectory = kioskHandler(async () => {
   const supabase = serviceClient();
 
-  // Fetched together rather than in sequence: three independent reads on the
-  // critical path of the tablet's first paint.
   const [companies, floors, formConfig] = await Promise.all([
     supabase.from('companies').select('id, name, name_ar, floor').order('name'),
     supabase.from('floors').select('number, name, name_ar, image_url').order('number'),
@@ -22,11 +19,10 @@ export default kioskHandler('GET', async (_req: VercelRequest, res: VercelRespon
 
   if (companies.error || floors.error) {
     console.error('directory read failed:', companies.error ?? floors.error);
-    json(res, 502, { error: 'directory_unavailable' });
-    return;
+    return json(502, { error: 'directory_unavailable' });
   }
 
-  json(res, 200, {
+  return json(200, {
     companies: (companies.data ?? []).map((c) => ({
       id: c.id,
       name: c.name,
@@ -37,11 +33,14 @@ export default kioskHandler('GET', async (_req: VercelRequest, res: VercelRespon
       number: f.number,
       name: f.name,
       nameAr: f.name_ar,
-      imageUrl: f.image_url,
+      imageUrl: f.image_url ?? '',
     })),
-    // Which fields the check-in form shows. The kiosk cannot read form_config
-    // directly, and a missing row means every field is shown, which is what the
-    // form defaulted to before.
+    // A missing row means every field is shown, as the form did before.
     formFields: formConfig.data?.fields ?? null,
   });
 });
+
+/** Vercel entry point. The self-hosted server uses handleDirectory directly. */
+export function GET(request: Request): Promise<Response> {
+  return handleDirectory(request);
+}

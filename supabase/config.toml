@@ -1,0 +1,44 @@
+# Local Supabase (Supabase CLI: `supabase start`, `supabase db reset`).
+#
+# `supabase db reset` applies every file in supabase/migrations in order, so a
+# fresh local database has exactly the schema the cloud project has. Then run
+# supabase/scripts/bootstrap-superadmin.sql once to create your first account.
+#
+# For a self-hosted production server (the Docker setup, not the CLI), the same
+# two auth settings below are environment variables in that stack's .env:
+#   DISABLE_SIGNUP=true
+#   ENABLE_EMAIL_AUTOCONFIRM=true
+
+project_id = "vms"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:8787"]
+# Nobody signs themselves up. Staff accounts are created by an administrator
+# through /api/staff/accounts, which uses the admin API; that path is not
+# affected by this switch.
+enable_signup = false
+
+[auth.email]
+enable_signup = false
+# Admin-created accounts are confirmed at creation, so this only matters for
+# accounts made some other way. Off locally, since there is no mail server.
+enable_confirmations = false
+
+[storage]
+enabled = true
+file_size_limit = "10MiB"

@@ -7,21 +7,6 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 // Primary client — used for all app operations and auth sessions
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Secondary client used only when admin creates a new staff account.
-// It uses an in-memory-only auth store so signUp doesn't overwrite
-// the currently logged-in admin's session.
-export const supabaseCreator = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: {
-      getItem: () => null,
-      setItem: () => {},
-      removeItem: () => {},
-    },
-    persistSession: false,
-    autoRefreshToken: false,
-    detectSessionInUrl: false,
-  },
-});
 
 // ---- DB row types (snake_case from Supabase) ----
 
@@ -224,36 +209,5 @@ export function fromFloor(f: FloorInfo) {
   };
 }
 
-// ---- Storage helpers ----
-
-/**
- * Upload a file to a Supabase Storage bucket and return its public URL.
- * Uses `upsert: true` so re-uploading the same path overwrites the old file.
- */
-export async function uploadFile(bucket: string, path: string, file: File): Promise<string> {
-  const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
-  if (error) throw new Error(error.message);
-  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-  return data.publicUrl;
-}
-
-/**
- * Fetch a remote URL (e.g. Supabase Storage public URL) and return it as
- * a base64 data URL. Used to convert storage URLs into base64 for jsPDF.
- * Returns an empty string on failure so callers can handle gracefully.
- */
-export async function urlToBase64(url: string): Promise<string> {
-  if (!url) return '';
-  try {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    return await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return '';
-  }
-}
+// Storage helpers live in src/data/storage.ts. Files are stored by object path,
+// not URL, so rows stay valid when the app moves to a self-hosted server.

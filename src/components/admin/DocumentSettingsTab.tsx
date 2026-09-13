@@ -18,6 +18,7 @@ import { UploadOutlined, ReloadOutlined, SaveOutlined } from '@ant-design/icons'
 import type { UploadProps } from 'antd';
 import { useDocumentSettingsStore } from '../../store/documentSettingsStore';
 import type { DocumentSettings } from '../../store/documentSettingsStore';
+import { useStorageUrl } from '../../data/storage';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -28,6 +29,7 @@ export default function DocumentSettingsTab() {
   const uploadLogo = useDocumentSettingsStore(state => state.uploadLogo);
   const removeLogo = useDocumentSettingsStore(state => state.removeLogo);
   const reset = useDocumentSettingsStore(state => state.reset);
+  const logoSrc = useStorageUrl('document-logos', settings.logoUrl);
 
   const [form] = Form.useForm();
   const [logoUploading, setLogoUploading] = useState(false);
@@ -120,9 +122,9 @@ export default function DocumentSettingsTab() {
             </Title>
           </Col>
           <Col xs={24} md={5} style={{ textAlign: 'center' }}>
-            {settings.logoUrl ? (
+            {logoSrc ? (
               <AntImage
-                src={settings.logoUrl}
+                src={logoSrc}
                 alt="logo"
                 height={80}
                 style={{ objectFit: 'contain', maxWidth: '100%' }}

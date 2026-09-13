@@ -19,7 +19,7 @@ jobs:
       - run: npm run lint
       - run: npm run test:run
 
-  bundle-budget:
+  builds:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,9 +28,19 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Build kiosk target
-        run: npm run build:kiosk
-        env:
-          VITE_APP_TARGET: kiosk
-      - name: Enforce kiosk bundle budget and credential absence
-        run: bash scripts/verify-kiosk-build.sh
+
+      - name: Build and gate the kiosk
+        run: |
+          npm run build:kiosk
+          npm run verify:kiosk
+
+      - name: Build and gate the staff app
+        run: |
+          rm -rf dist
+          npm run build:staff
+          npm run verify:staff
+
+      # The self-hosted server must keep building, or the move off Vercel breaks
+      # silently.
+      - name: Build the self-hosted server
+        run: npm run build:server

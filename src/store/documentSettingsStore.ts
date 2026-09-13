@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from '../data/persist';
-import { supabase, uploadFile, urlToBase64 } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
+import { removeFromStorage, storageObjectAsDataUrl, uploadToStorage } from '../data/storage';
 
 export interface DocumentSettings {
   admissionName: string;
@@ -10,7 +11,7 @@ export interface DocumentSettings {
   visionNumber: string;
   visionNumberLabel: string;
   formName: string;
-  logoUrl: string;      // Supabase Storage public URL — stored in DB, used for display
+  logoUrl: string;      // object path in the document-logos bucket; resolved to a URL when shown
   logoDataUrl: string;  // base64 — derived from logoUrl on fetch, in-memory only, used by jsPDF
 }
 
@@ -36,8 +37,8 @@ const DEFAULTS: DocumentSettings = {
   logoDataUrl: '',
 };
 
-function upsertToDb(s: DocumentSettings, rollback: () => void) {
-  void persist(
+function upsertToDb(s: DocumentSettings, rollback: () => void): Promise<boolean> {
+  return persist(
     'documentSettings.save',
     () =>
       supabase
@@ -73,7 +74,7 @@ export const useDocumentSettingsStore = create<DocumentSettingsState>()((set, ge
     if (!data) { set({ loaded: true }); return; }
 
     const logoUrl = data.logo_url ?? '';
-    const logoDataUrl = logoUrl ? await urlToBase64(logoUrl) : '';
+    const logoDataUrl = await storageObjectAsDataUrl('document-logos', logoUrl);
 
     set({
       settings: {
@@ -99,20 +100,28 @@ export const useDocumentSettingsStore = create<DocumentSettingsState>()((set, ge
   },
 
   uploadLogo: async (file: File) => {
-    const ext = file.name.split('.').pop() ?? 'png';
-    const logoUrl = await uploadFile('document-logos', `logo.${ext}`, file);
-    const logoDataUrl = await urlToBase64(logoUrl);
+    const ext = (file.name.split('.').pop() ?? 'png').toLowerCase();
+    // A fresh name per upload. Browsers cache a public URL, so reusing one name
+    // kept showing the old logo after it was replaced.
+    const logoUrl = await uploadToStorage('document-logos', `logo-${Date.now()}.${ext}`, file);
+    const logoDataUrl = await storageObjectAsDataUrl('document-logos', logoUrl);
     const previous = get().settings;
     const settings = { ...previous, logoUrl, logoDataUrl };
     set({ settings });
-    upsertToDb(settings, () => set({ settings: previous }));
+
+    const saved = await upsertToDb(settings, () => set({ settings: previous }));
+    // Keep exactly one logo in the bucket: drop the old file once the new one is
+    // saved, or the new file if saving failed.
+    await removeFromStorage('document-logos', saved ? previous.logoUrl : logoUrl).catch(() => {});
   },
 
   removeLogo: () => {
     const previous = get().settings;
     const settings = { ...previous, logoUrl: '', logoDataUrl: '' };
     set({ settings });
-    upsertToDb(settings, () => set({ settings: previous }));
+    void upsertToDb(settings, () => set({ settings: previous })).then((saved) => {
+      if (saved) void removeFromStorage('document-logos', previous.logoUrl).catch(() => {});
+    });
   },
 
   reset: () => {

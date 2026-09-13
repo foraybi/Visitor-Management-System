@@ -104,7 +104,12 @@ export default defineConfig(() => {
 
   return {
     plugins: [react(), ...(target === 'kiosk' ? [kioskPwa()] : [])],
-    server: { host: true },
+    server: {
+      host: true,
+      // `npm run dev:api` serves the same handlers Vercel runs, so creating a
+      // staff account or checking in works in development too.
+      proxy: { '/api': 'http://localhost:8787' },
+    },
     build: {
       // Never ship source maps to production; the staff app talks to Supabase
       // directly and readable sources make that surface easier to probe.
@@ -117,7 +122,7 @@ export default defineConfig(() => {
       environment: 'jsdom',
       globals: true,
       setupFiles: ['./src/test/setup.ts'],
-      include: ['src/**/*.{test,spec}.{ts,tsx}'],
+      include: ['src/**/*.{test,spec}.{ts,tsx}', 'api/**/*.{test,spec}.ts'],
     },
   };
 });

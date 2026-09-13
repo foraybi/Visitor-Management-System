@@ -262,5 +262,45 @@
     "visitor.exit": "checking the visitor out",
     "formConfig.save": "saving the form settings",
     "documentSettings.save": "saving the document settings"
+  },
+  "staff": {
+    "tab": "Staff accounts",
+    "title": "Staff accounts",
+    "add": "Add staff account",
+    "createTitle": "Create staff account",
+    "create": "Create account",
+    "name": "Full name",
+    "email": "Email",
+    "password": "Password",
+    "role": "Role",
+    "createdAt": "Created",
+    "nameRule": "Enter the staff member's name",
+    "emailRule": "Enter a valid email",
+    "passwordRule": "Password must be 8 to 72 characters",
+    "noVerificationNeeded": "The account can sign in immediately. No verification email is sent.",
+    "createdMessage": "Account created for {{email}}",
+    "removed": "Account removed. It can no longer sign in.",
+    "remove": "Remove",
+    "removeConfirmTitle": "Remove this account?",
+    "removeConfirmBody": "The account is deleted and can no longer sign in anywhere.",
+    "roles": {
+      "superadmin": "Super admin",
+      "admin": "Admin",
+      "frontdesk": "Front desk"
+    },
+    "errors": {
+      "unauthorised": "Your session has expired. Sign in again.",
+      "forbidden": "You are not allowed to do that.",
+      "invalid_email": "Enter a valid email address.",
+      "weak_password": "Password must be 8 to 72 characters.",
+      "invalid_name": "Enter the staff member's name.",
+      "invalid_role": "Choose a valid role.",
+      "email_taken": "An account with that email already exists.",
+      "invalid_id": "That account could not be found.",
+      "cannot_remove_self": "You cannot remove your own account.",
+      "not_found": "That account no longer exists.",
+      "offline": "No connection. Nothing was changed.",
+      "server_error": "Something went wrong. Nothing was changed."
+    }
   }
 }

@@ -140,7 +140,7 @@ export interface StaffProfile {
   id: string;
   email: string;
   fullName: string | null;
-  role: 'admin' | 'frontdesk';
+  role: 'superadmin' | 'admin' | 'frontdesk';
   createdAt: string;
 }
 

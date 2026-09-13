@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { json, targetAllows, type Handler } from './http';
+import { serviceClient } from './supabaseAdmin';
 
 /**
  * Shared plumbing for the kiosk endpoints.
@@ -8,31 +8,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
  * The tablet holds no Supabase credentials. It sends a device token to these
  * endpoints, which run on the server, hold the service key, and act on the
  * tablet's behalf. Developer tools on the tablet therefore show a request to
- * this app's own origin and nothing else: no project URL, no key, no table
- * names, no schema.
- *
- * SUPABASE_SERVICE_ROLE_KEY must never be renamed to carry a VITE_ prefix. Vite
- * inlines every VITE_ variable into the client bundle, which would put the
- * service key on the tablet and undo the entire arrangement.
+ * this app's own origin and nothing else.
  */
-
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-let cached: SupabaseClient | null = null;
-
-/** The service-role client. Bypasses Row Level Security, so it never leaves the server. */
-export function serviceClient(): SupabaseClient {
-  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-    throw new Error(
-      'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set on the kiosk project',
-    );
-  }
-  cached ??= createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return cached;
-}
 
 export interface KioskDevice {
   id: string;
@@ -47,18 +24,12 @@ function hashToken(token: string): string {
 function hashesMatch(a: string, b: string): boolean {
   const left = Buffer.from(a, 'utf8');
   const right = Buffer.from(b, 'utf8');
-  if (left.length !== right.length) return false;
-  return timingSafeEqual(left, right);
+  return left.length === right.length && timingSafeEqual(left, right);
 }
 
-/**
- * Resolve the calling tablet, or null if the token is missing, unknown or
- * revoked. Revocation is a single row flipped, with no key rotation and no
- * effect on any other device.
- */
-export async function authenticateDevice(req: VercelRequest): Promise<KioskDevice | null> {
-  const header = req.headers['x-kiosk-token'];
-  const token = Array.isArray(header) ? header[0] : header;
+/** The calling tablet, or null if the token is missing, unknown or revoked. */
+export async function authenticateDevice(request: Request): Promise<KioskDevice | null> {
+  const token = request.headers.get('x-kiosk-token');
   if (!token || token.length < 32) return null;
 
   const supabase = serviceClient();
@@ -66,23 +37,24 @@ export async function authenticateDevice(req: VercelRequest): Promise<KioskDevic
 
   const { data, error } = await supabase
     .from('kiosk_devices')
-    .select('id, label, token_hash, active')
+    .select('id, label, token_hash')
     .eq('token_hash', digest)
     .eq('active', true)
     .maybeSingle();
 
   if (error || !data || !hashesMatch(data.token_hash, digest)) return null;
 
-  // Fire and forget: a failed heartbeat must not fail a check-in.
+  // A failed heartbeat must not fail a check-in.
   void supabase
     .from('kiosk_devices')
     .update({ last_seen_at: new Date().toISOString() })
-    .eq('id', data.id);
+    .eq('id', data.id)
+    .then(() => undefined);
 
   return { id: data.id, label: data.label };
 }
 
-/** Returns true when the call is within its limit. */
+/** True when the call is within its limit. Fails closed. */
 export async function withinRateLimit(
   deviceId: string,
   action: string,
@@ -95,47 +67,27 @@ export async function withinRateLimit(
     p_limit: limit,
     p_window_seconds: windowSeconds,
   });
-  // Fail closed. If the limiter is unavailable we refuse rather than open the
-  // enumeration path it exists to close.
-  if (error) return false;
-  return data === true;
-}
-
-export function json(res: VercelResponse, status: number, body: unknown): void {
-  res.status(status).setHeader('Cache-Control', 'no-store').json(body);
+  return !error && data === true;
 }
 
 /**
- * Wrap a handler with method checking and device authentication.
- *
- * Errors are logged server-side and answered with a generic message, so a
- * malformed request cannot be used to map the schema from the tablet.
+ * Wrap a kiosk handler with the deployment check, device authentication and a
+ * generic error response, so a malformed request cannot be used to map the
+ * schema from the tablet.
  */
 export function kioskHandler(
-  method: 'GET' | 'POST',
-  handler: (
-    req: VercelRequest,
-    res: VercelResponse,
-    device: KioskDevice,
-  ) => Promise<void>,
-) {
-  return async (req: VercelRequest, res: VercelResponse): Promise<void> => {
-    if (req.method !== method) {
-      json(res, 405, { error: 'method_not_allowed' });
-      return;
-    }
-
-    const device = await authenticateDevice(req);
-    if (!device) {
-      json(res, 401, { error: 'unauthorised_device' });
-      return;
-    }
+  handler: (request: Request, device: KioskDevice) => Promise<Response>,
+): Handler {
+  return async (request) => {
+    if (!targetAllows('kiosk')) return json(404, { error: 'not_found' });
 
     try {
-      await handler(req, res, device);
+      const device = await authenticateDevice(request);
+      if (!device) return json(401, { error: 'unauthorised_device' });
+      return await handler(request, device);
     } catch (cause) {
-      console.error(`kiosk handler failed for device ${device.id}:`, cause);
-      json(res, 500, { error: 'server_error' });
+      console.error('kiosk handler failed:', cause);
+      return json(500, { error: 'server_error' });
     }
   };
 }
