@@ -35,3 +35,4 @@ dist-server
 # Supabase CLI local state
 supabase/.temp
 supabase/.branches
+.env.bak

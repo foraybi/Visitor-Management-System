@@ -1,56 +1,60 @@
 -- =============================================================================
--- Make one existing auth user a super admin who can sign in
+-- STEP 2: make yourself a super admin who can sign in
 -- =============================================================================
--- Not a migration. Run it by hand in the SQL editor (or psql) whenever a server
--- needs its first super admin: the cloud project today, the self-hosted one
--- after the move.
+-- Run STEP 1 first:
+--   supabase/migrations/20260913000001_admin_access_and_grants.sql
+-- Until that has run, the database refuses to create a super admin from the
+-- SQL editor, whatever this file does.
 --
--- Requires migration 20260913000001 first. Before it, the role trigger refuses
--- this insert from the SQL editor.
+-- HOW TO USE
+--   1. The account must already exist under Authentication > Users.
+--   2. Replace YOUR-PASSWORD-HERE with your password. Keep the single quotes.
+--      It appears once. Replace-all is safe.
+--   3. If the email is not yours, replace it too. Replace-all is safe.
+--   4. Run the whole file. The last query says whether it worked.
 --
--- What it does, for the user whose email you set below:
---   * sets the password, so the account can sign in with email and password
---     (an invited user has no password until they accept the invitation)
---   * marks the email as confirmed, so sign-in is not refused as unverified
---   * creates or updates the profiles row with role 'superadmin'
---   * removes the stale role from user_metadata, which is no longer read
---
--- The password lands in the SQL editor's query history. Change it from the app
--- afterwards if that matters for this server.
+-- Nothing in this file can reject you. Any failure will be an ordinary SQL
+-- error, not a message written by me.
 
 create extension if not exists pgcrypto with schema extensions;
 
-do $$
-declare
-  v_email     text := 'csfo.41@gmail.com';
-  v_full_name text := 'Fawaz Oraybi';
-  v_password  text := 'CHANGE-ME';   -- at least 8 characters
-  v_user_id   uuid;
-begin
-  if v_password = 'CHANGE-ME' or length(v_password) < 8 then
-    raise exception 'Set v_password to a real password of at least 8 characters before running.';
-  end if;
+-- ── Set a password and confirm the email ────────────────────────────────────
+-- An invited user has no password until the invitation is accepted, which is
+-- why signing in says "Invalid login credentials". This sets one. It also drops
+-- the old role claim, which the app no longer reads and should not keep.
 
-  select id into v_user_id from auth.users where lower(email) = lower(v_email);
+update auth.users
+set encrypted_password = extensions.crypt('YOUR-PASSWORD-HERE', extensions.gen_salt('bf')),
+    email_confirmed_at = coalesce(email_confirmed_at, now()),
+    raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) - 'role',
+    updated_at = now()
+where lower(email) = lower('csfo.41@gmail.com');
 
-  if v_user_id is null then
-    raise exception 'No auth user with email %. Add it under Authentication > Users first, then run this again.', v_email;
-  end if;
+-- ── Give that account the super admin role ──────────────────────────────────
+-- The app reads the role from this table, never from the login token.
 
-  update auth.users
-  set encrypted_password = extensions.crypt(v_password, extensions.gen_salt('bf')),
-      email_confirmed_at = coalesce(email_confirmed_at, now()),
-      raw_user_meta_data = (coalesce(raw_user_meta_data, '{}'::jsonb) - 'role')
-                           || jsonb_build_object('full_name', v_full_name),
-      updated_at         = now()
-  where id = v_user_id;
+insert into public.profiles (id, email, full_name, role)
+select id, lower(email), 'Fawaz Oraybi', 'superadmin'
+from auth.users
+where lower(email) = lower('csfo.41@gmail.com')
+on conflict (id) do update
+  set role = 'superadmin',
+      email = excluded.email,
+      full_name = excluded.full_name;
 
-  insert into public.profiles (id, email, full_name, role)
-  values (v_user_id, v_email, v_full_name, 'superadmin')
-  on conflict (id) do update
-    set role = 'superadmin',
-        email = excluded.email,
-        full_name = excluded.full_name;
+-- ── Did it work? ────────────────────────────────────────────────────────────
+-- Expect exactly one row:
+--   has_password     true
+--   email_confirmed  true
+--   role             superadmin
+--
+-- No rows means no account with that email exists. Create it under
+-- Authentication > Users, then run this file again.
 
-  raise notice 'Super admin ready: % (%)', v_email, v_user_id;
-end $$;
+select u.email,
+       u.encrypted_password is not null as has_password,
+       u.email_confirmed_at is not null as email_confirmed,
+       p.role
+from auth.users u
+left join public.profiles p on p.id = u.id
+where lower(u.email) = lower('csfo.41@gmail.com');
