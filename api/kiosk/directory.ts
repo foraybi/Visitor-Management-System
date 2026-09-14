@@ -1,6 +1,6 @@
-import { json } from '../_lib/http';
-import { kioskHandler } from '../_lib/kiosk';
-import { serviceClient } from '../_lib/supabaseAdmin';
+import { json } from '../_lib/http.js';
+import { kioskHandler } from '../_lib/kiosk.js';
+import { serviceClient } from '../_lib/supabaseAdmin.js';
 
 /**
  * The company and floor picker, plus which check-in fields to show.

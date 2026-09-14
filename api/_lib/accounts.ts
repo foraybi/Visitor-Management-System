@@ -1,4 +1,4 @@
-import { canAdminister, isRole, type Role } from '../../src/domain/access/access';
+import { canAdminister, isRole, type Role } from '../../src/domain/access/access.js';
 
 /**
  * The decisions behind staff account management, kept pure so they are tested

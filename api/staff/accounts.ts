@@ -1,8 +1,8 @@
-import { isRole } from '../../src/domain/access/access';
-import { decideCreate, decideDelete, type Actor } from '../_lib/accounts';
-import { json, readJson, targetAllows, type Handler } from '../_lib/http';
-import { authenticateStaff } from '../_lib/staffAuth';
-import { serviceClient } from '../_lib/supabaseAdmin';
+import { isRole } from '../../src/domain/access/access.js';
+import { decideCreate, decideDelete, type Actor } from '../_lib/accounts.js';
+import { json, readJson, targetAllows, type Handler } from '../_lib/http.js';
+import { authenticateStaff } from '../_lib/staffAuth.js';
+import { serviceClient } from '../_lib/supabaseAdmin.js';
 
 /**
  * Create and remove staff accounts.

@@ -1,6 +1,6 @@
-import { isRole } from '../../src/domain/access/access';
-import type { Actor } from './accounts';
-import { serviceClient } from './supabaseAdmin';
+import { isRole } from '../../src/domain/access/access.js';
+import type { Actor } from './accounts.js';
+import { serviceClient } from './supabaseAdmin.js';
 
 /**
  * Identify the signed-in staff member making a request.

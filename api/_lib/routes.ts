@@ -1,9 +1,9 @@
-import type { Handler } from './http';
-import { handleCheckIn } from '../kiosk/check-in';
-import { handleCheckOut } from '../kiosk/check-out';
-import { handleDirectory } from '../kiosk/directory';
-import { handleLookupEmployee } from '../kiosk/lookup-employee';
-import { createAccount, deleteAccount } from '../staff/accounts';
+import type { Handler } from './http.js';
+import { handleCheckIn } from '../kiosk/check-in.js';
+import { handleCheckOut } from '../kiosk/check-out.js';
+import { handleDirectory } from '../kiosk/directory.js';
+import { handleLookupEmployee } from '../kiosk/lookup-employee.js';
+import { createAccount, deleteAccount } from '../staff/accounts.js';
 
 /**
  * Every API route, for hosts that do not route by file name.

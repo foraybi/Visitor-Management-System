@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decideCreate, decideDelete, type Actor } from './accounts';
+import { decideCreate, decideDelete, type Actor } from './accounts.js';
 
 const superadmin: Actor = { id: '11111111-1111-4111-8111-111111111111', role: 'superadmin' };
 const admin: Actor = { id: '22222222-2222-4222-8222-222222222222', role: 'admin' };

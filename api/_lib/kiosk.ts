@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { json, targetAllows, type Handler } from './http';
-import { serviceClient } from './supabaseAdmin';
+import { json, targetAllows, type Handler } from './http.js';
+import { serviceClient } from './supabaseAdmin.js';
 
 /**
  * Shared plumbing for the kiosk endpoints.

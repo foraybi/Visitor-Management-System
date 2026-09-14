@@ -1,7 +1,7 @@
-import { json, readJson } from '../_lib/http';
-import { kioskHandler, todayInRiyadh } from '../_lib/kiosk';
-import { serviceClient } from '../_lib/supabaseAdmin';
-import { parseIdentityNumber, type IdentityType } from '../../src/domain/identity/identity';
+import { json, readJson } from '../_lib/http.js';
+import { kioskHandler, todayInRiyadh } from '../_lib/kiosk.js';
+import { serviceClient } from '../_lib/supabaseAdmin.js';
+import { parseIdentityNumber, type IdentityType } from '../../src/domain/identity/identity.js';
 
 /**
  * Record a check-in and return the visitor-facing code.
