@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { Row, Col, Card, Empty } from 'antd';
-import { BuildOutlined } from '@ant-design/icons';
+import { Row, Col, Empty } from 'antd';
+import { BuildOutlined, CheckCircleFilled } from '@ant-design/icons';
 import { useUIStore } from '../../store/uiStore';
 
 
@@ -22,6 +22,14 @@ interface FloorGridProps {
   floors: FloorOption[];
 }
 
+/**
+ * The floor picker.
+ *
+ * The chosen floor has to be obvious from across a lobby, so selection is
+ * carried by several cues at once rather than a border colour alone: a thick
+ * brand outline with a glow, a check badge, a "Selected" label, and the other
+ * floors dimmed.
+ */
 export default function FloorGrid({ value, onChange, floors }: FloorGridProps) {
   const { t } = useTranslation();
   const { language } = useUIStore();
@@ -30,81 +38,65 @@ export default function FloorGrid({ value, onChange, floors }: FloorGridProps) {
     return <Empty description={t('visitor.noFloors')} />;
   }
 
-  // Sort by floor number
   const sortedFloors = [...floors].sort((a, b) => a.number - b.number);
-
   const colSpan = sortedFloors.length <= 3 ? 24 / sortedFloors.length : 8;
+  const hasSelection = value !== null;
 
   return (
-    <Row gutter={[16, 16]}>
-      {sortedFloors.map(floor => (
-        <Col xs={24} sm={12} md={colSpan} key={floor.number}>
-          <Card
-            hoverable
-            onClick={() => onChange(floor.number)}
-            style={{
-              textAlign: 'center',
-              cursor: 'pointer',
-              border:
-                value === floor.number
-                  ? '2px solid rgb(0, 114, 151)'
-                  : '2px solid rgba(0, 0, 0, 0.06)',
-              background:
-                value === floor.number
-                  ? 'rgba(0, 114, 151, 0.08)'
-                  : 'rgba(255, 255, 255, 0.7)',
-              transition: 'all 0.3s',
-              overflow: 'hidden',
-            }}
-            styles={{ body: { padding: 0 } }}
-          >
-            {floor.imageUrl ? (
-              <div
-                style={{
-                  height: 100,
-                  backgroundImage: `url(${floor.imageUrl})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  height: 100,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background:
-                    value === floor.number
-                      ? 'linear-gradient(135deg, rgb(0, 114, 151), rgb(0, 166, 207))'
-                      : 'linear-gradient(135deg, #f5f5f5, #e0e0e0)',
-                }}
-              >
-                <BuildOutlined
-                  style={{
-                    fontSize: 40,
-                    color: value === floor.number ? 'white' : '#9ca3af',
-                  }}
-                />
-              </div>
-            )}
-            <div style={{ padding: 16 }}>
-              <div
-                style={{
-                  fontWeight: 700,
-                  color: value === floor.number ? 'rgb(0, 114, 151)' : '#1f1f1f',
-                  fontSize: 16,
-                }}
-              >
-                {language === 'ar' ? floor.nameAr : floor.name}
-              </div>
-              <div style={{ color: '#6b7280', fontSize: 13, marginTop: 4 }}>
-                {t('visitor.floor')} {floor.number}
+    <Row gutter={[16, 16]} role="radiogroup" aria-label={t('visitor.floor')}>
+      {sortedFloors.map((floor) => {
+        const selected = value === floor.number;
+        return (
+          <Col xs={24} sm={12} md={colSpan} key={floor.number}>
+            <div
+              role="radio"
+              aria-checked={selected}
+              tabIndex={0}
+              onClick={() => onChange(floor.number)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onChange(floor.number);
+                }
+              }}
+              className={`floor-card${selected ? ' floor-card-selected' : ''}${
+                hasSelection && !selected ? ' floor-card-dimmed' : ''
+              }`}
+            >
+              {selected && (
+                <span className="floor-card-badge" aria-hidden>
+                  <CheckCircleFilled />
+                </span>
+              )}
+
+              {floor.imageUrl ? (
+                <div className="floor-card-media" style={{ backgroundImage: `url(${floor.imageUrl})` }} />
+              ) : (
+                <div className="floor-card-media floor-card-media-empty">
+                  <BuildOutlined />
+                </div>
+              )}
+
+              <div className="floor-card-body">
+                <div className="floor-card-name">
+                  {language === 'ar' ? floor.nameAr : floor.name}
+                </div>
+                <div className="floor-card-meta">
+                  {selected ? (
+                    <span className="floor-card-selected-label">
+                      <CheckCircleFilled /> {t('visitor.floorSelected')}
+                    </span>
+                  ) : (
+                    <>
+                      {t('visitor.floor')} {floor.number}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
-          </Card>
-        </Col>
-      ))}
+          </Col>
+        );
+      })}
     </Row>
   );
 }

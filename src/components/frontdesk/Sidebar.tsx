@@ -10,12 +10,14 @@ import {
   AppstoreOutlined,
   FormOutlined,
   FileTextOutlined,
+  CalendarOutlined,
 } from '@ant-design/icons';
 import { useUIStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
 import { useNavigate } from 'react-router-dom';
+import { ROLE_TONE } from '../staff/roleTone';
 
-const { Title, Text } = Typography;
+const { Title } = Typography;
 
 interface SidebarProps {
   activeTab: string;
@@ -53,6 +55,11 @@ export default function Sidebar({
     },
     ...(showAdminMenu
       ? [
+          {
+            key: 'attendance',
+            icon: <CalendarOutlined />,
+            label: t('admin.attendance'),
+          },
           {
             key: 'analytics',
             icon: <PieChartOutlined />,
@@ -100,12 +107,17 @@ export default function Sidebar({
         <Title level={4} style={{ color: 'white', margin: 0 }}>
           {t('common.appName')}
         </Title>
-        <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
-          {currentRole === 'admin' ? t('login.admin') : t('login.frontDesk')}
-        </Text>
+        {/* Every role by name. This used to say "Front desk" for anyone who was
+            not exactly an admin, super admins included. */}
+        {currentRole && (
+          <span className="sidebar-role" style={{ background: ROLE_TONE[currentRole].color }}>
+            {ROLE_TONE[currentRole].icon}
+            {t(`staff.roles.${currentRole}`)}
+          </span>
+        )}
       </div>
 
-      <div style={{ flex: 1, padding: 16 }}>
+      <div style={{ flex: 1, padding: 16, overflowY: 'auto' }}>
         <Menu
           mode="inline"
           selectedKeys={[activeTab]}
@@ -127,7 +139,7 @@ export default function Sidebar({
               color: 'white',
             }}
           >
-            {language.toUpperCase()}
+            {language === 'ar' ? 'English' : 'العربية'}
           </Button>
           <Button
             block

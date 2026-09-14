@@ -55,10 +55,10 @@ export default function FloorsTab() {
     const data = { ...values, imageUrl };
     if (editingFloor) {
       updateFloor(editingFloor.id, data);
-      message.success('Floor updated');
+      message.success(t('admin.floorUpdated'));
     } else {
       addFloor(data);
-      message.success('Floor added');
+      message.success(t('admin.floorAdded'));
     }
     setModalOpen(false);
     form.resetFields();
@@ -118,12 +118,12 @@ export default function FloorsTab() {
       render: (num) => <strong style={{ color: 'rgb(0, 114, 151)' }}>{num}</strong>,
     },
     {
-      title: t('admin.floorName') + ' (EN)',
+      title: t('admin.floorNameEn'),
       dataIndex: 'name',
       key: 'name',
     },
     {
-      title: t('admin.floorName') + ' (AR)',
+      title: t('admin.floorNameAr'),
       dataIndex: 'nameAr',
       key: 'nameAr',
     },
@@ -140,11 +140,11 @@ export default function FloorsTab() {
             {t('common.edit')}
           </Button>
           <Popconfirm
-            title="Delete floor?"
-            description="This cannot be undone"
+            title={t('admin.deleteFloorConfirm')}
+            description={t('common.cannotUndo')}
             onConfirm={() => {
               deleteFloor(record.id);
-              message.success('Floor deleted');
+              message.success(t('admin.floorDeleted'));
             }}
             okText={t('common.delete')}
             cancelText={t('common.cancel')}
@@ -201,14 +201,14 @@ export default function FloorsTab() {
             <InputNumber size="large" min={1} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item
-            label={`${t('admin.floorName')} (English)`}
+            label={t('admin.floorNameEn')}
             name="name"
             rules={[{ required: true }]}
           >
             <Input size="large" placeholder="Ground Floor" />
           </Form.Item>
           <Form.Item
-            label={`${t('admin.floorName')} (العربية)`}
+            label={t('admin.floorNameAr')}
             name="nameAr"
             rules={[{ required: true }]}
           >
@@ -226,11 +226,11 @@ export default function FloorsTab() {
               )}
               <Space>
                 <Upload {...uploadProps}>
-                  <Button icon={<UploadOutlined />}>Upload Image</Button>
+                  <Button icon={<UploadOutlined />}>{t('admin.uploadImage')}</Button>
                 </Upload>
                 {imageUrl && (
                   <Button onClick={() => setImageUrl('')} danger>
-                    Remove
+                    {t('common.remove')}
                   </Button>
                 )}
               </Space>

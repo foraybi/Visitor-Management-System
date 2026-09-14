@@ -113,6 +113,21 @@ export function identityLabelKey(type: IdentityType): string {
   return `visitor.identity.${type}`;
 }
 
+/**
+ * The identity type a bare number implies.
+ *
+ * The employee check-in and check-out screens ask for one number rather than a
+ * type and a number. Ten digits starting with 1 is a national id, any other ten
+ * digits an iqama, and anything else is read as a passport. The result is still
+ * validated by `parseIdentityNumber`, so a malformed number is refused rather
+ * than guessed into shape.
+ */
+export function inferIdentityType(raw: string): IdentityType {
+  const value = normalise(raw ?? '');
+  if (/^\d{10}$/.test(value)) return value.startsWith('1') ? 'national_id' : 'iqama';
+  return 'passport';
+}
+
 /** The i18n key for the message explaining a rejection. */
 export function identityErrorKey(reason: IdentityError): string {
   return `visitor.identity.errors.${reason}`;

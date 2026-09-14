@@ -4,6 +4,8 @@ import { Card, Row, Col, Empty, Typography } from 'antd';
 import { Pie, Column, Line } from '@ant-design/charts';
 import { useVisitorStore } from '../../store/visitorStore';
 import { useCompanyStore } from '../../store/companyStore';
+import { useFloorStore } from '../../store/floorStore';
+import { useUIStore } from '../../store/uiStore';
 
 const { Title } = Typography;
 
@@ -22,6 +24,8 @@ export default function AnalyticsTab() {
   const { t } = useTranslation();
   const { visitors } = useVisitorStore();
   const { companies } = useCompanyStore();
+  const floors = useFloorStore(s => s.floors);
+  const language = useUIStore(s => s.language);
 
   // Gender distribution (from company employees)
   const genderData = useMemo(() => {
@@ -49,17 +53,20 @@ export default function AnalyticsTab() {
     ].filter(d => d.value > 0);
   }, [visitors, t]);
 
-  // Visits by floor
+  // Visits by floor, over the floors that actually exist rather than a fixed
+  // one to three.
   const floorData = useMemo(() => {
-    const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0 };
+    const counts: Record<number, number> = {};
     visitors.forEach(v => {
       counts[v.floor] = (counts[v.floor] ?? 0) + 1;
     });
-    return [1, 2, 3].map(floor => ({
-      floor: `${t('visitor.floor')} ${floor}`,
-      visits: counts[floor] ?? 0,
-    }));
-  }, [visitors, t]);
+    return [...floors]
+      .sort((a, b) => a.number - b.number)
+      .map(f => ({
+        floor: language === 'ar' ? f.nameAr : f.name,
+        visits: counts[f.number] ?? 0,
+      }));
+  }, [visitors, floors, language]);
 
   // Peak hours (0-23)
   const peakHoursData = useMemo(() => {
@@ -113,13 +120,13 @@ export default function AnalyticsTab() {
         <Card
           title={
             <Title level={5} style={{ margin: 0 }}>
-              Employees by Gender
+              {t('admin.chartGender')}
             </Title>
           }
           styles={{ body: { height: 320 } }}
         >
           {genderData.length === 0 ? (
-            <Empty description="No data" />
+            <Empty description={t('common.noData')} />
           ) : (
             <Pie
               data={genderData}
@@ -148,13 +155,13 @@ export default function AnalyticsTab() {
         <Card
           title={
             <Title level={5} style={{ margin: 0 }}>
-              Visitors vs Employees
+              {t('admin.chartVisitorTypes')}
             </Title>
           }
           styles={{ body: { height: 320 } }}
         >
           {visitorTypeData.length === 0 ? (
-            <Empty description="No visits yet" />
+            <Empty description={t('common.noVisitsYet')} />
           ) : (
             <Pie
               data={visitorTypeData}
@@ -183,28 +190,20 @@ export default function AnalyticsTab() {
         <Card
           title={
             <Title level={5} style={{ margin: 0 }}>
-              Visits by Floor
+              {t('admin.chartByFloor')}
             </Title>
           }
           styles={{ body: { height: 320 } }}
         >
           {floorData.every(d => d.visits === 0) ? (
-            <Empty description="No visits yet" />
+            <Empty description={t('common.noVisitsYet')} />
           ) : (
             <Column
               data={floorData}
               xField="floor"
               yField="visits"
               colorField="floor"
-              scale={{
-                color: {
-                  range: [
-                    'rgb(0, 114, 151)',
-                    'rgb(0, 166, 207)',
-                    'rgb(16, 154, 169)',
-                  ],
-                },
-              }}
+              scale={{ color: { range: BRAND_COLORS } }}
               label={{
                 text: 'visits',
                 position: 'top',
@@ -222,13 +221,13 @@ export default function AnalyticsTab() {
         <Card
           title={
             <Title level={5} style={{ margin: 0 }}>
-              Peak Visit Hours
+              {t('admin.chartPeakHours')}
             </Title>
           }
           styles={{ body: { height: 340 } }}
         >
           {peakHoursData.every(d => d.visits === 0) ? (
-            <Empty description="No visits yet" />
+            <Empty description={t('common.noVisitsYet')} />
           ) : (
             <Column
               data={peakHoursData}
@@ -250,13 +249,13 @@ export default function AnalyticsTab() {
         <Card
           title={
             <Title level={5} style={{ margin: 0 }}>
-              Top Nationalities
+              {t('admin.chartNationalities')}
             </Title>
           }
           styles={{ body: { height: 340 } }}
         >
           {nationalityData.length === 0 ? (
-            <Empty description="No data" />
+            <Empty description={t('common.noData')} />
           ) : (
             <Pie
               data={nationalityData}
@@ -280,13 +279,13 @@ export default function AnalyticsTab() {
         <Card
           title={
             <Title level={5} style={{ margin: 0 }}>
-              Visits — Last 7 Days
+              {t('admin.chartLast7Days')}
             </Title>
           }
           styles={{ body: { height: 340 } }}
         >
           {weeklyData.every(d => d.visits === 0) ? (
-            <Empty description="No visits yet" />
+            <Empty description={t('common.noVisitsYet')} />
           ) : (
             <Line
               data={weeklyData}

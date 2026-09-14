@@ -70,7 +70,7 @@ export default function CompanyEmployeeForm({ companyId, open, onClose }: Props)
       verificationStatus: 'pending', // ← front-desk additions await admin verification
     };
     addEmployee(companyId, data);
-    message.success(t('admin.pending'));
+    message.success(t('employee.pending'));
     form.resetFields();
     setNationalityType(null);
     onClose();

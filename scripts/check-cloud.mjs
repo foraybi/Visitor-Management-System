@@ -76,13 +76,16 @@ async function main() {
   }
 
   // ── Migrations, inferred from what the public key can and cannot reach ────
+  // Since 20260914081044 the role helpers live in the `private` schema, which
+  // the API does not expose, so "no such function" is the state to reach. A
+  // permission error means the older public helper is still there.
   const { error: roleFnError } = await anon.rpc('current_app_role');
-  if (roleFnError?.code === MISSING_FUNCTION) {
-    todo('Migration 20260909000001_roles.sql', 'Not run yet.');
-  } else if (roleFnError?.code === PERMISSION_DENIED || /permission denied/i.test(roleFnError?.message ?? '')) {
-    ok('Migration 20260909000001_roles.sql');
+  if (!roleFnError) {
+    danger('current_app_role is callable with the public key', 'Run 20260914081044_restructure_security_and_types.sql now.');
+  } else if (roleFnError.code === MISSING_FUNCTION) {
+    ok('Migration 20260914081044_restructure_security_and_types.sql');
   } else {
-    todo('Migration 20260909000001_roles.sql', 'Ran, but the public key can still call current_app_role. Run it again.');
+    todo('Migration 20260914081044_restructure_security_and_types.sql', 'Not run yet: the role helpers are still in the public schema.');
   }
 
   const tables = {

@@ -35,6 +35,7 @@ import type { ColumnsType } from 'antd/es/table';
 import type { UploadProps } from 'antd';
 import dayjs from 'dayjs';
 import type { CompanyFormValues, EmployeeFormValues } from '../../types/forms';
+import { identityLabelKey } from '../../domain/identity/identity';
 import { presenceIndex } from '../../domain/presence/presence';
 import { useCompanyStore } from '../../store/companyStore';
 import { useFloorStore } from '../../store/floorStore';
@@ -146,7 +147,7 @@ export default function ManagementTab() {
         // Stores the object path, not a URL, so the row survives a server move.
         resolvedPhotoUrl = await uploadToStorage('employee-photos', `${crypto.randomUUID()}.${ext}`, photoFile);
       } catch {
-        message.error('Failed to upload photo — employee saved without photo.');
+        message.error(t('admin.photoUploadFailed'));
         resolvedPhotoUrl = '';
       }
     }
@@ -219,7 +220,14 @@ export default function ManagementTab() {
           <Button size="small" icon={<EditOutlined />} onClick={() => openEditCompany(record)}>
             {t('common.edit')}
           </Button>
-          <Popconfirm title="Delete company?" onConfirm={() => deleteCompany(record.id)}>
+          <Popconfirm
+            title={t('admin.deleteCompanyConfirm')}
+            description={t('common.cannotUndo')}
+            okText={t('common.delete')}
+            cancelText={t('common.cancel')}
+            okButtonProps={{ danger: true }}
+            onConfirm={() => deleteCompany(record.id)}
+          >
             <Button size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
@@ -248,7 +256,7 @@ export default function ManagementTab() {
       render: (_, r) => (language === 'ar' ? r.nameAr : r.name),
     },
     {
-      title: 'Company',
+      title: t('table.companyName'),
       key: 'companyName',
       width: 140,
       render: (_, r) => (language === 'ar' ? r.companyNameAr : r.companyName),
@@ -264,9 +272,7 @@ export default function ManagementTab() {
       dataIndex: 'nationalityType',
       key: 'nationalityType',
       width: 110,
-      render: (v: NationalityType) =>
-        v === 'national_id' ? t('visitor.nationalityType') :
-        v === 'iqama' ? 'Iqama' : 'Passport',
+      render: (v: NationalityType) => t(identityLabelKey(v)),
     },
     {
       title: t('table.idNumber'),
@@ -369,22 +375,22 @@ export default function ManagementTab() {
       },
     },
     {
-      title: t('admin.verified'),
+      title: t('employee.verified'),
       dataIndex: 'verificationStatus',
       key: 'verificationStatus',
       width: 140,
       render: (s: string, record) =>
         s === 'verified' ? (
-          <Tag color="success">{t('admin.verified')}</Tag>
+          <Tag color="success">{t('employee.verified')}</Tag>
         ) : (
           <Space size="small">
-            <Tag color="warning">{t('admin.pending')}</Tag>
+            <Tag color="warning">{t('employee.pending')}</Tag>
             <Button
               size="small"
               type="primary"
               onClick={() => verifyEmployee(record.companyId, record.id)}
             >
-              {t('admin.verify')}
+              {t('employee.verify')}
             </Button>
           </Space>
         ),
@@ -400,7 +406,14 @@ export default function ManagementTab() {
             icon={<EditOutlined />}
             onClick={() => openEditEmployee(record, record.companyId)}
           />
-          <Popconfirm title="Delete employee?" onConfirm={() => deleteEmployee(record.companyId, record.id)}>
+          <Popconfirm
+            title={t('admin.deleteEmployeeConfirm')}
+            description={t('common.cannotUndo')}
+            okText={t('common.delete')}
+            cancelText={t('common.cancel')}
+            okButtonProps={{ danger: true }}
+            onConfirm={() => deleteEmployee(record.companyId, record.id)}
+          >
             <Button size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
@@ -746,7 +759,7 @@ export default function ManagementTab() {
             name="fullName"
             rules={[{ required: true, message: t('staff.nameRule') }]}
           >
-            <Input size="large" placeholder="Ahmed Al-Rashidi" />
+            <Input size="large" placeholder={t('visitor.namePlaceholder')} />
           </Form.Item>
           <Form.Item
             label={t('staff.email')}

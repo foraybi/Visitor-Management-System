@@ -1,29 +1,52 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Form, Input, Button, Result, Space, message } from 'antd';
-import { CheckCircleOutlined } from '@ant-design/icons';
+import { Modal, Form, Input, Button, Result, Row, Col, Segmented, message } from 'antd';
+import { CheckCircleOutlined, IdcardOutlined, NumberOutlined } from '@ant-design/icons';
 import { kioskErrorKey, useKioskStore } from '../../app/kiosk/kioskStore';
+import type { CheckOutRequest } from '../../data/kioskGateway';
+import { inferIdentityType, parseIdentityNumber } from '../../domain/identity/identity';
 
 interface ExitModalProps {
   onClose: () => void;
 }
 
+type Mode = 'code' | 'employee';
+
+const DIGIT_KEYS = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End', 'Enter'];
+
+/**
+ * Check out at the tablet.
+ *
+ * A visitor enters the code from their visitor card. An employee is never shown
+ * a code, so they choose "Employee ID" and enter the identity number they
+ * checked in with. Before this, employees had no way to check out at the kiosk
+ * and their attendance never got an exit time.
+ */
 export default function ExitModal({ onClose }: ExitModalProps) {
   const { t } = useTranslation();
   const checkOut = useKioskStore(s => s.checkOut);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [mode, setMode] = useState<Mode>('code');
   const [form] = Form.useForm();
 
-  const handleSubmit = async (values: { visitorId: string }) => {
-    const normalizedId = values.visitorId.trim().padStart(4, '0');
-    if (!/^\d{4}$/.test(normalizedId)) {
-      message.error(t('visitor.validation.visitCodeFormat'));
-      return;
+  const handleSubmit = async (values: { visitCode?: string; idNumber?: string }) => {
+    let request: CheckOutRequest;
+    if (mode === 'code') {
+      const code = (values.visitCode ?? '').trim().padStart(4, '0');
+      if (!/^\d{4}$/.test(code)) {
+        message.error(t('visitor.validation.visitCodeFormat'));
+        return;
+      }
+      request = { visitCode: code };
+    } else {
+      const idNumber = values.idNumber ?? '';
+      // One number, as at check-in: the type follows from its shape.
+      request = { idType: inferIdentityType(idNumber), idNumber };
     }
 
     setSubmitting(true);
-    const result = await checkOut(normalizedId);
+    const result = await checkOut(request);
     setSubmitting(false);
 
     if (result.ok) {
@@ -34,20 +57,18 @@ export default function ExitModal({ onClose }: ExitModalProps) {
 
     // Every failure is shown. A dropped network used to look identical to
     // success here, because the update was fired and its error swallowed.
-    message.error(
-      result.error === 'no_active_visit' ? t('visitor.exitError') : t(kioskErrorKey(result.error)),
-    );
+    if (result.error === 'no_active_visit') {
+      message.error(mode === 'code' ? t('visitor.exitError') : t('visitor.exitErrorEmployee'));
+    } else {
+      message.error(t(kioskErrorKey(result.error)));
+    }
   };
 
   if (success) {
     return (
-      <Modal open={true} footer={null} closable={false} centered width={420}>
+      <Modal open={true} footer={null} closable={false} centered width="min(460px, 94vw)">
         <Result
-          icon={
-            <CheckCircleOutlined
-              style={{ color: 'rgb(127, 188, 66)', fontSize: 80 }}
-            />
-          }
+          icon={<CheckCircleOutlined style={{ color: 'rgb(127, 188, 66)', fontSize: 88 }} />}
           title={t('visitor.exitSuccess')}
           subTitle={t('visitor.thankYou')}
         />
@@ -62,55 +83,93 @@ export default function ExitModal({ onClose }: ExitModalProps) {
       footer={null}
       title={t('visitor.exitTitle')}
       centered
-      width={420}
-      destroyOnClose
+      width="min(600px, 94vw)"
+      className="kiosk-modal"
+      destroyOnHidden
     >
       <Form
         form={form}
         layout="vertical"
         onFinish={handleSubmit}
         requiredMark={false}
+        className="enter-form-large"
         style={{ marginTop: 16 }}
       >
-        <Form.Item
-          label={t('visitor.visitorIdPlaceholder')}
-          name="visitorId"
-          rules={[
-            { required: true, message: t('common.required') },
-            {
-              pattern: /^\d{1,4}$/,
-              message: t('visitor.validation.visitCodeFormat'),
-            },
-          ]}
-        >
-          <Input
+        <Form.Item label={t('visitor.checkOutWith')}>
+          <Segmented<Mode>
+            block
             size="large"
-            inputMode="numeric"
-            type="tel"
-            placeholder="0001"
-            maxLength={4}
-            autoFocus
-            onKeyDown={(e) => {
-              if (
-                !/^[0-9]$/.test(e.key) &&
-                !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End', 'Enter'].includes(e.key)
-              ) {
-                e.preventDefault();
-              }
+            value={mode}
+            onChange={(next) => {
+              setMode(next);
+              form.resetFields();
             }}
+            options={[
+              { value: 'code', label: t('visitor.checkOutByCode'), icon: <NumberOutlined /> },
+              { value: 'employee', label: t('visitor.checkOutByEmployeeId'), icon: <IdcardOutlined /> },
+            ]}
           />
         </Form.Item>
 
-        <Form.Item style={{ marginBottom: 0, marginTop: 24 }}>
-          <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
-            <Button size="large" onClick={onClose} disabled={submitting}>
+        {mode === 'code' ? (
+          <Form.Item
+            label={t('visitor.checkOutCodeHint')}
+            name="visitCode"
+            rules={[
+              { required: true, message: t('common.required') },
+              { pattern: /^\d{1,4}$/, message: t('visitor.validation.visitCodeFormat') },
+            ]}
+          >
+            <Input
+              className="kiosk-code-input"
+              inputMode="numeric"
+              type="tel"
+              placeholder="0001"
+              maxLength={4}
+              autoFocus
+              onKeyDown={(e) => {
+                if (!/^[0-9]$/.test(e.key) && !DIGIT_KEYS.includes(e.key)) e.preventDefault();
+              }}
+            />
+          </Form.Item>
+        ) : (
+          <Form.Item
+            label={t('visitor.checkOutEmployeeHint')}
+            name="idNumber"
+            rules={[
+              {
+                validator: (_, value: string | undefined) => {
+                  if (!value?.trim()) return Promise.reject(new Error(t('common.required')));
+                  return parseIdentityNumber(inferIdentityType(value), value).ok
+                    ? Promise.resolve()
+                    : Promise.reject(new Error(t('visitor.errors.invalid_identity')));
+                },
+              },
+            ]}
+          >
+            <Input
+              size="large"
+              autoFocus
+              autoComplete="off"
+              maxLength={20}
+              placeholder={t('visitor.employeeIdNumberPlaceholder')}
+              prefix={<IdcardOutlined style={{ color: 'rgba(0,0,0,0.45)' }} />}
+            />
+          </Form.Item>
+        )}
+
+        <Row gutter={12} style={{ marginTop: 8 }}>
+          <Col span={12}>
+            <Button size="large" block onClick={onClose} disabled={submitting}>
               {t('common.cancel')}
             </Button>
-            <Button type="primary" size="large" htmlType="submit" loading={submitting}>
+          </Col>
+          <Col span={12}>
+            <Button type="primary" size="large" block htmlType="submit" loading={submitting}>
               {t('common.submit')}
             </Button>
-          </Space>
-        </Form.Item>
+          </Col>
+        </Row>
       </Form>
     </Modal>
   );

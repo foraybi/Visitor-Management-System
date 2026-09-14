@@ -71,6 +71,14 @@ export interface CheckInSuccess {
   floor: number;
 }
 
+/**
+ * How a visit is closed. A visitor uses the code on their card. An employee is
+ * never shown a code, so they use the identity number they checked in with.
+ */
+export type CheckOutRequest =
+  | { visitCode: string }
+  | { idType: IdentityType; idNumber: string };
+
 export type KioskError =
   /** The request never reached the server. Retrying may work. */
   | 'offline'
@@ -91,7 +99,7 @@ export interface KioskGateway {
     idNumber: string,
   ): Promise<KioskResult<EmployeeMatch | null>>;
   checkIn(request: CheckInRequest): Promise<KioskResult<CheckInSuccess>>;
-  checkOut(visitCode: string): Promise<KioskResult<{ name: string }>>;
+  checkOut(request: CheckOutRequest): Promise<KioskResult<{ name: string }>>;
 }
 
 // ── Device token ────────────────────────────────────────────────────────────
@@ -205,7 +213,7 @@ export function httpKioskGateway(options: HttpGatewayOptions = {}): KioskGateway
 
     checkIn: (request) => call<CheckInSuccess>('/check-in', { method: 'POST', body: request }),
 
-    checkOut: (visitCode) =>
-      call<{ name: string }>('/check-out', { method: 'POST', body: { visitCode } }),
+    checkOut: (request) =>
+      call<{ name: string }>('/check-out', { method: 'POST', body: request }),
   };
 }

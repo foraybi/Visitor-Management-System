@@ -12,5 +12,8 @@
       "PowerShell($node = \"C:\\\\Program Files\\\\nodejs\\\\node.exe\"; $tsc = \"c:\\\\Users\\\\csfo4\\\\Desktop\\\\Monshaat_Visitor_Managment_System_Project\\\\Visitor-Management-System\\\\node_modules\\\\.bin\\\\tsc.cmd\"; cd \"c:\\\\Users\\\\csfo4\\\\Desktop\\\\Monshaat_Visitor_Managment_System_Project\\\\Visitor-Management-System\"; & $tsc --noEmit 2>&1)",
       "PowerShell($env:PATH = \"C:\\\\Program Files\\\\nodejs;\" + $env:PATH; node --version; & \"C:\\\\Program Files\\\\nodejs\\\\node.exe\" \"c:\\\\Users\\\\csfo4\\\\Desktop\\\\Monshaat_Visitor_Managment_System_Project\\\\Visitor-Management-System\\\\node_modules\\\\typescript\\\\bin\\\\tsc\" --noEmit --project \"c:\\\\Users\\\\csfo4\\\\Desktop\\\\Monshaat_Visitor_Managment_System_Project\\\\Visitor-Management-System\\\\tsconfig.app.json\" 2>&1)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }

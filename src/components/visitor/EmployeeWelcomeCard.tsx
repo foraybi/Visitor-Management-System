@@ -33,7 +33,7 @@ export default function EmployeeWelcomeCard({
   }, [onClose]);
 
   return (
-    <Modal open={true} footer={null} closable={false} centered width={500}>
+    <Modal open={true} footer={null} closable={false} centered width="min(520px, 94vw)">
       <div style={{ padding: 16, textAlign: 'center' }}>
         <CheckCircleOutlined style={{ fontSize: 64, color: 'rgb(127, 188, 66)', marginBottom: 16 }} />
         <Title level={2} style={{ color: 'rgb(0, 114, 151)', marginBottom: 8 }}>

@@ -1,56 +1,77 @@
 -- =============================================================================
--- STEP 2: make one existing account the super admin
+-- Make one account the super admin
 -- =============================================================================
--- Run STEP 1 first:
---   supabase/migrations/20260913000001_admin_access_and_grants.sql
--- If you see "only a superadmin may create" or "only a superadmin may change a
--- role" when running this file, STEP 1 has not been run yet.
+-- Run in the Supabase dashboard: SQL Editor, paste, Run.
 --
 -- HOW TO USE
---   1. Run this file exactly as it is. It changes nothing, and the list at the
---      bottom shows every account that exists and the role it has.
---   2. Copy your email from that list. Replace YOUR-EMAIL-HERE with it, and
---      replace YOUR-PASSWORD-HERE with the password you want. Keep the quotes.
---      Replace-all is safe for both.
---   3. Run the file again. The list at the bottom should now show your email
---      with role superadmin.
+--   1. The account must already exist in THIS project. Either pick an email
+--      from the list this file prints at the bottom, or create the account
+--      first: Authentication > Users > Add user > Create new user, tick
+--      "Auto Confirm User", and set the password there.
+--   2. Replace YOUR-EMAIL-HERE below with that email. Keep the quotes.
+--   3. Run. The list at the bottom should show that email with role superadmin.
 --
--- Setting the password is harmless for an account that already has one. It
--- simply becomes the password you typed here.
+-- If the email is not an account in this project the script stops with an
+-- error naming the accounts that do exist, and changes nothing.
+--
+-- Password: leave new_password as '' to keep the account's current password.
+-- Only fill it in for an existing account whose password you do not know, and
+-- then choose a password you use nowhere else: the text of every statement run
+-- here, including this one, is written to the database logs.
 
-create extension if not exists pgcrypto with schema extensions;
+do $$
+declare
+  target_email text := lower(trim('YOUR-EMAIL-HERE'));
+  new_password text := '';
+  target_id    uuid;
+begin
+  -- Not filled in yet: change nothing, just print the account list below.
+  if target_email = lower('YOUR-EMAIL-HERE') then
+    raise notice 'Email not filled in. Showing the accounts only.';
+    return;
+  end if;
 
--- ── Set the password and confirm the email ──────────────────────────────────
--- Also drops the old role claim from the login token, which the app no longer
--- reads and which used to be editable by the user it described.
+  select id into target_id from auth.users where lower(email) = target_email;
 
-update auth.users
-set encrypted_password = extensions.crypt('YOUR-PASSWORD-HERE', extensions.gen_salt('bf')),
-    email_confirmed_at = coalesce(email_confirmed_at, now()),
-    raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) - 'role',
-    updated_at = now()
-where lower(email) = lower('YOUR-EMAIL-HERE');
+  if target_id is null then
+    raise exception 'No account with email % in this project. Accounts that exist: %. Create it under Authentication > Users > Add user (Auto Confirm User), then run this again.',
+      target_email,
+      coalesce((select string_agg(email, ', ' order by created_at) from auth.users), 'none');
+  end if;
 
--- ── Give that account the super admin role ──────────────────────────────────
--- The app reads the role from this table, never from the login token. An
--- account with no row here cannot sign in at all.
+  if new_password <> '' then
+    if length(new_password) < 8 then
+      raise exception 'The password must be at least 8 characters.';
+    end if;
+    update auth.users
+    set encrypted_password = extensions.crypt(new_password, extensions.gen_salt('bf'))
+    where id = target_id;
+  end if;
 
-insert into public.profiles (id, email, full_name, role)
-select id, lower(email), coalesce(raw_user_meta_data ->> 'full_name', email), 'superadmin'
-from auth.users
-where lower(email) = lower('YOUR-EMAIL-HERE')
-on conflict (id) do update
-  set role = 'superadmin',
-      email = excluded.email;
+  -- Confirm the email, and drop the old role claim from the editable metadata.
+  update auth.users
+  set email_confirmed_at = coalesce(email_confirmed_at, now()),
+      raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) - 'role',
+      updated_at = now()
+  where id = target_id;
+
+  -- The app reads the role from this table, never from the login token.
+  insert into public.profiles (id, email, full_name, role)
+  select id, lower(email), coalesce(raw_user_meta_data ->> 'full_name', email), 'superadmin'
+  from auth.users
+  where id = target_id
+  on conflict (id) do update
+    set role = 'superadmin',
+        email = excluded.email;
+end $$;
 
 -- ── Every account, and what it can do ───────────────────────────────────────
--- Exactly one row should say superadmin. A row saying "no profile row" cannot
--- sign in, whatever its password is.
+-- A row saying "no profile row" cannot sign in, whatever its password is.
 
 select u.email,
        coalesce(p.role, '-- no profile row, cannot sign in --') as role,
-       u.encrypted_password is not null as has_password,
        u.email_confirmed_at is not null as email_confirmed,
+       u.last_sign_in_at::date as last_sign_in,
        u.created_at::date as created
 from auth.users u
 left join public.profiles p on p.id = u.id

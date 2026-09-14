@@ -12,6 +12,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 type VisitorRow = {
   id: string;
+  visit_code: string;
   name: string;
   phone: string;
   email: string | null;
@@ -75,6 +76,7 @@ type FloorRow = {
 export function toVisitor(row: VisitorRow): Visitor {
   return {
     id: row.id,
+    visitCode: row.visit_code ?? '',
     name: row.name,
     phone: row.phone,
     email: row.email ?? undefined,

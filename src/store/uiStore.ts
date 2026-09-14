@@ -29,6 +29,14 @@ export const useUIStore = create<UIState>()(
         set({ sidebarOpen: open });
       },
     }),
-    { name: 'vms-ui' }
+    {
+      name: 'vms-ui',
+      // The saved language was restored into the store but never handed to
+      // i18n, which always starts in Arabic. After a reload in English the page
+      // was laid out left to right with Arabic text.
+      onRehydrateStorage: () => (state) => {
+        if (state && i18n.language !== state.language) void i18n.changeLanguage(state.language);
+      },
+    }
   )
 );

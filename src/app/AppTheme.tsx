@@ -3,9 +3,10 @@ import { ConfigProvider, theme } from 'antd';
 import enUS from 'antd/locale/en_US';
 import arEG from 'antd/locale/ar_EG';
 import { useUIStore } from '../store/uiStore';
+import { useHaptics } from './useHaptics';
 
 /**
- * Theme, direction and locale, shared by both builds.
+ * Theme, direction, locale and tap feedback, shared by both builds.
  *
  * Extracted from App.tsx when the kiosk and staff apps were split, so the two
  * cannot drift into looking like different products.
@@ -13,6 +14,7 @@ import { useUIStore } from '../store/uiStore';
 export default function AppTheme({ children }: { children: ReactNode }) {
   const dir = useUIStore((s) => s.dir);
   const language = useUIStore((s) => s.language);
+  useHaptics();
 
   useEffect(() => {
     document.documentElement.dir = dir;

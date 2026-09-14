@@ -54,9 +54,9 @@ npm run check:cloud
 
 Run it again after each fix until it says Ready. The usual items:
 
-- Run `supabase/migrations/20260913000001_admin_access_and_grants.sql` in the SQL
-  editor. Without it, the super admin script below is refused.
-- Put your password into `supabase/scripts/bootstrap-superadmin.sql` and run it.
+- Run any migration in `supabase/migrations/` that it reports as not run.
+- Put your email into `supabase/scripts/bootstrap-superadmin.sql` and run it in the
+  SQL editor. The account must already exist in this project.
 - Turn off "Allow new users to sign up" under Authentication, Sign In / Providers.
 - Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to `.env`. The service key is
   under Project Settings, API. Never give it a `VITE_` prefix.
@@ -147,9 +147,56 @@ does not see the registration. Android tablets share storage between Chrome and
 the installed app, so the real kiosk tablets are not affected.
 
 **Plain Wi-Fi addresses cannot test everything.** Browsers allow the offline
-shell, installing the app and keeping the screen awake only over HTTPS. Test
-those three on a Vercel preview deployment, which is HTTPS and is not your
-production site.
+shell, installing the app and keeping the screen awake only over HTTPS or on
+`localhost`. On the computer itself, test them with `npm run preview:kiosk` (next
+section). On a tablet, test them on a Vercel preview deployment, which is HTTPS
+and is not your production site.
+
+### Installing the kiosk as an app
+
+`npm run dev:all` never shows an install button. The Vite dev server does not
+generate the web app manifest or the service worker (`/sw.js`); only a production
+build does, and a browser offers to install a site only when both exist. To test
+installing on your computer, build the kiosk and serve it:
+
+```bash
+npm run preview:kiosk      # builds, then serves the kiosk and its API on http://localhost:4174
+```
+
+It reads the same `.env` and uses its own port, so it can run alongside
+`npm run dev:all`. Run it again after changing code; it does not reload.
+
+1. **Register this address.** A registration belongs to one address, so the one
+   made on port 5174 does not carry over to 4174. Provision a device for it and
+   open the link it prints:
+
+   ```bash
+   KIOSK_URL=http://localhost:4174 node --env-file=.env scripts/provision-kiosk-device.mjs "Mac preview"
+   ```
+
+2. **Install it.**
+
+   | Browser | How to install |
+   |---|---|
+   | Chrome or Edge, on Mac or Windows | The install icon at the right end of the address bar, or menu ⋮ → Cast, save and share → Install page as app |
+   | Chrome on an Android tablet | Menu ⋮ → Install app, or Add to Home screen |
+   | Safari on an iPad | Share → Add to Home Screen, but read the note below first |
+   | Safari on a Mac | File → Add to Dock, with the same caveat as the iPad |
+   | Firefox | Does not install web apps. Use Chrome or Edge |
+
+3. **Open the installed app.** It starts at the welcome screen, already
+   registered, in its own window.
+
+**Register in the browser first, then install from that same browser.** Chrome
+and Edge, on a computer or on Android, share storage with the app they install,
+so the installed app sees the registration. An iPad home-screen app, and a Mac
+Safari "Add to Dock" app, get storage of their own, and have no address bar to
+open the registration link in, so they would stay on "This tablet is not
+registered". On an iPad, run the kiosk in Safari itself and lock it with Guided
+Access instead of installing it.
+
+To uninstall on a computer, open the installed app and choose Uninstall from its
+menu, or go to `chrome://apps` in Chrome.
 
 ### Testing against a local database instead
 
@@ -179,11 +226,16 @@ the Supabase CLI, `supabase db reset` does this for a local instance.
 
 `supabase/config.toml` sets both for a CLI-based local instance.
 
-**3. First super admin.** Add the user under Authentication, Users. Then set
-the email, name and a password at the top of
-`supabase/scripts/bootstrap-superadmin.sql` and run it in the SQL editor. It sets
-the password, confirms the email and creates the profile row. Every other account
-is created from the admin console after that.
+**3. First super admin.** Add the user under Authentication, Users, Add user,
+with Auto Confirm User ticked and the password set there. Then put that email at
+the top of `supabase/scripts/bootstrap-superadmin.sql` and run it in the SQL
+editor. It confirms the email and creates the profile row, and stops with a list
+of the real accounts if the email is not one of them. Every other account is
+created from the admin console after that.
+
+**4. Password rules.** Under Authentication, Sign In / Providers, Email, set a
+minimum length of 12 and require digits, lowercase, uppercase and symbols.
+Leaked password protection needs the Pro plan.
 
 ## Deleting all data
 
@@ -261,14 +313,28 @@ URLs, and those are recognised and resolved against the new server.
 ## Each tablet
 
 ```bash
-node --env-file=.env scripts/provision-kiosk-device.mjs "Lobby tablet 1"
+KIOSK_URL=https://kiosk.yourdomain.com node --env-file=.env scripts/provision-kiosk-device.mjs "Lobby tablet 1"
 node --env-file=.env scripts/provision-kiosk-device.mjs --list
 node --env-file=.env scripts/provision-kiosk-device.mjs --revoke <device-id>
 ```
 
-The token is printed once. The script shows what to paste into the tablet's
-browser console. Lock the tablet with Android screen pinning or a managed kiosk
-policy: the app's own fullscreen handling does nothing against the back button.
+1. Run the first command on your computer, never on the tablet. `KIOSK_URL` is the
+   address the tablet will use: your kiosk domain in production,
+   `http://<computer's Wi-Fi address>:5174` with `npm run dev:all`, or
+   `http://localhost:4174` with `npm run preview:kiosk`.
+2. It prints a registration link, `<KIOSK_URL>/#device-token=<token>`, once. The
+   database stores only a hash of the token, so a lost link cannot be recovered:
+   revoke that device and provision a new one.
+3. Open the link on the tablet, in the browser the kiosk will run in. The token is
+   saved on the tablet and removed from the address bar.
+4. On Android, install it from Chrome (see [Installing the kiosk as an
+   app](#installing-the-kiosk-as-an-app)). On an iPad, keep it in Safari.
+5. Lock the tablet: Guided Access on an iPad, screen pinning or a managed kiosk
+   policy on Android. The app's own fullscreen handling does nothing against the
+   back button.
+
+`--list` shows each device with when it was last seen. `--revoke` makes that
+tablet's next request fail without affecting any other tablet.
 
 ## Before you call it deployed
 

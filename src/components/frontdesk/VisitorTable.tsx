@@ -1,16 +1,31 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card, Table, Input, Select, Tag, Button, Row, Col, DatePicker, Tooltip, Space } from 'antd';
+import {
+  Card,
+  Table,
+  Input,
+  Select,
+  Tag,
+  Button,
+  Row,
+  Col,
+  DatePicker,
+  Space,
+  Popconfirm,
+  Empty,
+} from 'antd';
 import { SearchOutlined, LogoutOutlined, FilePdfOutlined, FileExcelOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { type Dayjs } from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
+import { identityLabelKey } from '../../domain/identity/identity';
 import { useVisitorStore } from '../../store/visitorStore';
 import { useCompanyStore } from '../../store/companyStore';
 import { useFloorStore } from '../../store/floorStore';
 import { useUIStore } from '../../store/uiStore';
 import { useDocumentSettingsStore } from '../../store/documentSettingsStore';
-import { formatTimeFromISO, formatTimeSpent } from '../../utils/timeUtils';
+import { formatTimeFromISO } from '../../utils/timeUtils';
+import LiveDuration from '../common/LiveDuration';
 import type { Floor, Visitor } from '../../types';
 
 dayjs.extend(isoWeek);
@@ -36,15 +51,6 @@ export default function VisitorTable() {
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
   const [periodMode, setPeriodMode] = useState<PeriodMode>('all');
 
-  // Live-tick: re-render every 60s so Time Spent stays current for active
-  // visitors. A counter rather than Date.now(), so nothing impure is read
-  // during render; the cells read the clock themselves when they format.
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const id = window.setInterval(() => setTick(t => t + 1), 60_000);
-    return () => window.clearInterval(id);
-  }, []);
-
   // Index once rather than scanning the list per row. The search filter runs
   // this per visitor on every keystroke, so a linear find made filtering
   // O(visitors x companies).
@@ -69,7 +75,7 @@ export default function VisitorTable() {
     return language === 'ar' ? f.nameAr : f.name;
   };
 
-  // For employee-type visitor records, prefer the employeeNumber over the auto VST id
+  // For employee visits, show the employee number rather than the visit code.
   const employeeIdLookup = useMemo(() => {
     const map = new Map<string, string>();
     for (const c of companies) {
@@ -82,14 +88,13 @@ export default function VisitorTable() {
 
   const displayId = (v: Visitor) => {
     if (v.visitorType === 'employee') {
-      return employeeIdLookup.get(v.nationalityIdNumber) ?? v.id;
+      return employeeIdLookup.get(v.nationalityIdNumber) ?? v.visitCode;
     }
-    return v.id;
+    return v.visitCode;
   };
 
   // Compute [from, to] window. Date Mode picks the anchor; Period widens it.
   const dateWindow = useMemo<[string, string] | null>(() => {
-    // Date Mode resolves first
     if (dateMode === 'all') return null;
 
     let anchor: Dayjs;
@@ -101,18 +106,15 @@ export default function VisitorTable() {
     } else if (dateMode === 'specific') {
       anchor = singleDate;
     } else {
-      // dateMode === 'range'
       if (!dateRange || !dateRange[0] || !dateRange[1]) return null;
       rangeFrom = dateRange[0];
       rangeTo = dateRange[1];
       anchor = rangeFrom;
     }
 
-    // Period widens the window around the anchor (or the explicit range)
     let start: Dayjs;
     let end: Dayjs;
     if (dateMode === 'range') {
-      // For explicit range, period optionally widens by week/month/year on the from-date
       start = rangeFrom!.startOf('day');
       end = rangeTo!.endOf('day');
       if (periodMode === 'week') {
@@ -126,7 +128,6 @@ export default function VisitorTable() {
         end = rangeTo!.endOf('year');
       }
     } else {
-      // today / specific — period defines the window size around the anchor
       if (periodMode === 'all' || periodMode === 'day') {
         start = anchor.startOf('day');
         end = anchor.endOf('day');
@@ -159,6 +160,41 @@ export default function VisitorTable() {
     return `${from} → ${to}`;
   }, [dateMode, dateWindow, t]);
 
+  const filteredVisitors = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return dateFilteredVisitors.filter(v => {
+      const floorMatch = selectedFloor === 'all' || v.floor === selectedFloor;
+      const company = companiesById.get(v.visitedCompanyId);
+      const searchMatch =
+        !term ||
+        v.visitCode.includes(term) ||
+        v.name.toLowerCase().includes(term) ||
+        v.phone.includes(term) ||
+        (v.email ?? '').toLowerCase().includes(term) ||
+        v.nationalityIdNumber.toLowerCase().includes(term) ||
+        (company?.name ?? '').toLowerCase().includes(term) ||
+        (company?.nameAr ?? '').includes(term);
+      return floorMatch && searchMatch;
+    });
+  }, [dateFilteredVisitors, selectedFloor, searchTerm, companiesById]);
+
+  const exportLabels = {
+    visitorId: t('table.visitorId'),
+    status: t('table.status'),
+    name: t('table.name'),
+    phone: t('table.phone'),
+    email: t('table.email'),
+    nationality: t('table.nationality'),
+    idNumber: t('table.idNumber'),
+    floor: t('visitor.floor'),
+    company: t('table.companyName'),
+    timeIn: t('table.entryTime'),
+    timeOut: t('table.exitTime'),
+    timeSpent: t('table.timeSpent'),
+    active: t('table.active'),
+    exited: t('table.exited'),
+  };
+
   const handleExportPdf = async () => {
     const { exportVisitorsPdf } = await import('../../utils/exportPdf');
     await exportVisitorsPdf(filteredVisitors, {
@@ -168,23 +204,10 @@ export default function VisitorTable() {
       filterLabel,
       documentHeader,
       labels: {
+        ...exportLabels,
         title: t('frontdesk.exportReportTitle'),
         generated: t('frontdesk.exportGenerated'),
         filter: t('frontdesk.exportFilter'),
-        visitorId: t('table.visitorId'),
-        status: t('table.status'),
-        name: t('table.name'),
-        phone: t('table.phone'),
-        email: t('table.email'),
-        nationality: t('table.nationality'),
-        idNumber: t('table.idNumber'),
-        floor: t('visitor.floor'),
-        company: t('table.companyName'),
-        timeIn: t('table.entryTime'),
-        timeOut: t('table.exitTime'),
-        timeSpent: t('table.timeSpent'),
-        active: t('table.active'),
-        exited: t('table.exited'),
       },
     });
   };
@@ -198,241 +221,159 @@ export default function VisitorTable() {
       filterLabel,
       documentHeader,
       labels: {
-        visitorId: t('table.visitorId'),
-        status: t('table.status'),
-        name: t('table.name'),
-        phone: t('table.phone'),
-        email: t('table.email'),
-        nationality: t('table.nationality'),
-        idNumber: t('table.idNumber'),
-        floor: t('visitor.floor'),
-        company: t('table.companyName'),
-        timeIn: t('table.entryTime'),
-        timeOut: t('table.exitTime'),
-        timeSpent: t('table.timeSpent'),
-        active: t('table.active'),
-        exited: t('table.exited'),
+        ...exportLabels,
         sheetName: t('frontdesk.exportSheetName'),
         filter: t('frontdesk.exportFilter'),
       },
     });
   };
 
-  const filteredVisitors = useMemo(() => {
-    return dateFilteredVisitors.filter(v => {
-      const floorMatch = selectedFloor === 'all' || v.floor === selectedFloor;
-      const term = searchTerm.toLowerCase();
-      const searchMatch =
-        !term ||
-        v.id.toLowerCase().includes(term) ||
-        v.name.toLowerCase().includes(term) ||
-        v.phone.includes(searchTerm) ||
-        (v.email ?? '').toLowerCase().includes(term) ||
-        v.nationalityIdNumber.toLowerCase().includes(term) ||
-        (companiesById.get(v.visitedCompanyId)?.name ?? '').toLowerCase().includes(term) ||
-        (companiesById.get(v.visitedCompanyId)?.nameAr ?? '').includes(searchTerm);
-      return floorMatch && searchMatch;
-    });
-  }, [dateFilteredVisitors, selectedFloor, searchTerm, companiesById]);
-
-  // Show the Date column only when the filter spans more than today
-  const showDateColumn = useMemo(() => {
-    if (dateMode === 'all') return true;
-    if (dateMode === 'range') return true;
+  // Show the date under the times only when the filter spans more than one day.
+  const showDate = useMemo(() => {
+    if (dateMode === 'all' || dateMode === 'range') return true;
     if (dateMode === 'specific' && !singleDate.isSame(dayjs(), 'day')) return true;
-    if (periodMode === 'week' || periodMode === 'month' || periodMode === 'year') return true;
-    return false;
+    return periodMode === 'week' || periodMode === 'month' || periodMode === 'year';
   }, [dateMode, singleDate, periodMode]);
 
   const columns: ColumnsType<Visitor> = [
     {
-      title: t('table.visitorId'),
-      key: 'displayId',
-      width: 85,
-      render: (_, record) => (
-        <span style={{ fontWeight: 700, color: 'rgb(0, 114, 151)' }}>
-          {displayId(record)}
-        </span>
+      title: t('table.visitor'),
+      key: 'visitor',
+      width: 220,
+      render: (_, v) => (
+        <div className="visitor-cell">
+          <div className="visitor-avatar" data-type={v.visitorType} aria-hidden>
+            {(v.name.trim()[0] ?? '?').toUpperCase()}
+          </div>
+          <div className="visitor-cell-text">
+            <div className="cell-main" title={v.name}>{v.name || '—'}</div>
+            <div className="cell-sub">
+              <span dir="ltr">{v.phone || '—'}</span>
+              <Tag bordered={false} color={v.visitorType === 'employee' ? 'purple' : 'geekblue'} style={{ margin: 0 }}>
+                {v.visitorType === 'employee' ? t('visitor.employee') : t('visitor.visitor')}
+              </Tag>
+            </div>
+            {v.email && (
+              <div className="cell-sub" title={v.email}>
+                <span dir="ltr" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.email}</span>
+              </div>
+            )}
+          </div>
+        </div>
       ),
     },
     {
-      title: t('table.status'),
-      dataIndex: 'status',
-      key: 'status',
-      width: 80,
-      render: status => (
-        <Tag
-          color={status === 'active' ? 'success' : 'default'}
-          style={{ borderRadius: 6, padding: '2px 6px', margin: 0 }}
-        >
-          {status === 'active' ? t('table.active') : t('table.exited')}
-        </Tag>
+      title: t('table.visitCode'),
+      key: 'code',
+      width: 84,
+      render: (_, v) => <span className="visit-code" dir="ltr">{displayId(v)}</span>,
+    },
+    {
+      title: t('table.identity'),
+      key: 'identity',
+      width: 165,
+      render: (_, v) => (
+        <div>
+          <div className="cell-main cell-mono" dir="ltr">{v.nationalityIdNumber}</div>
+          <div className="cell-sub">
+            {t(identityLabelKey(v.nationalityType))}
+            {v.countryName ? ` · ${v.countryName}` : ''}
+          </div>
+        </div>
       ),
     },
     {
-      title: t('table.name'),
-      dataIndex: 'name',
-      key: 'name',
-      ellipsis: { showTitle: false },
-      render: (name: string) => (
-        <Tooltip title={name}>
-          <span>{name}</span>
-        </Tooltip>
-      ),
-    },
-    {
-      title: t('table.phone'),
-      dataIndex: 'phone',
-      key: 'phone',
-      width: 100,
-    },
-    {
-      title: t('table.email'),
-      dataIndex: 'email',
-      key: 'email',
-      ellipsis: { showTitle: false },
-      render: (email: string) =>
-        email ? (
-          <Tooltip title={email}>
-            <span>{email}</span>
-          </Tooltip>
-        ) : (
-          <span style={{ color: '#bfbfbf' }}>—</span>
-        ),
-    },
-    {
-      title: t('table.nationality'),
-      dataIndex: 'countryName',
-      key: 'countryName',
-      width: 100,
-      ellipsis: { showTitle: false },
-      render: (cn: string) => (
-        <Tooltip title={cn}>
-          <span>{cn}</span>
-        </Tooltip>
-      ),
-    },
-    {
-      title: t('table.idNumber'),
-      dataIndex: 'nationalityIdNumber',
-      key: 'nationalityIdNumber',
-      width: 110,
-      render: idNum => <span style={{ fontFamily: 'monospace' }}>{idNum}</span>,
-    },
-    {
-      title: t('visitor.floor'),
-      dataIndex: 'floor',
-      key: 'floor',
-      width: 110,
-      render: (num: number) => (
-        <Tooltip title={floorName(num)}>
-          <Tag color="blue" style={{ margin: 0 }}>{floorName(num)}</Tag>
-        </Tooltip>
-      ),
-    },
-    {
-      title: t('table.companyName'),
-      dataIndex: 'visitedCompanyId',
-      key: 'companyName',
-      ellipsis: { showTitle: false },
-      render: (id: string) => {
-        const name = companyName(id);
+      title: t('table.companyFloor'),
+      key: 'company',
+      width: 185,
+      render: (_, v) => {
+        const name = companyName(v.visitedCompanyId);
         return (
-          <Tooltip title={name}>
-            <span>{name}</span>
-          </Tooltip>
+          <div style={{ minWidth: 0 }}>
+            <div className="cell-main" title={name}>{name}</div>
+            <div className="cell-sub">
+              <Tag color="cyan" style={{ margin: 0 }}>{floorName(v.floor)}</Tag>
+            </div>
+          </div>
         );
       },
     },
     {
-      title: t('employee.type'),
-      dataIndex: 'visitorType',
-      key: 'visitorType',
-      width: 90,
-      render: (vt: string) => (
-        <Tag color={vt === 'employee' ? 'purple' : 'geekblue'}>
-          {vt === 'employee' ? t('visitor.employee') : t('visitor.visitor')}
-        </Tag>
+      title: t('table.inOut'),
+      key: 'inOut',
+      width: 125,
+      render: (_, v) => (
+        <div>
+          <div className="cell-main" dir="ltr" style={{ textAlign: 'start' }}>
+            {formatTimeFromISO(v.entryTime)} → {v.exitTime ? formatTimeFromISO(v.exitTime) : '…'}
+          </div>
+          {showDate && <div className="cell-sub" dir="ltr">{v.date}</div>}
+        </div>
       ),
     },
     {
-      title: t('table.entryTime'),
-      dataIndex: 'entryTime',
-      key: 'entryTime',
-      width: 80,
-      render: formatTimeFromISO,
-    },
-    {
-      title: t('table.exitTime'),
-      dataIndex: 'exitTime',
-      key: 'exitTime',
-      width: 80,
-      render: formatTimeFromISO,
-    },
-    {
+      // Status and time spent share a column: the ticking clock is what "active"
+      // means, and one column fewer keeps the check-out button on screen.
       title: t('table.timeSpent'),
-      key: 'timeSpent',
-      width: 90,
-      render: (_, record) => (
-        <span style={{ fontWeight: 600 }}>
-          {formatTimeSpent(record.entryTime, record.exitTime)}
-        </span>
+      key: 'status',
+      width: 130,
+      render: (_, v) => (
+        <div>
+          <Tag color={v.status === 'active' ? 'success' : 'default'} style={{ margin: 0 }}>
+            <span className="status-dot" />
+            {v.status === 'active' ? t('table.active') : t('table.exited')}
+          </Tag>
+          <div style={{ marginTop: 4 }}>
+            <LiveDuration entryTime={v.entryTime} exitTime={v.exitTime} />
+          </div>
+        </div>
       ),
     },
-    ...(showDateColumn
-      ? [
-          {
-            title: t('table.date'),
-            dataIndex: 'date',
-            key: 'date',
-            width: 100,
-          } as const,
-        ]
-      : []),
     {
       title: t('table.actions'),
       key: 'actions',
-      width: 80,
-      render: (_, record) =>
-        record.status === 'active' ? (
-          <Button
-            size="small"
-            danger
-            icon={<LogoutOutlined />}
-            onClick={() => exitVisitor(record.id)}
-          />
+      width: 140,
+      render: (_, v) =>
+        v.status === 'active' ? (
+          <Popconfirm
+            title={t('table.checkOutConfirm')}
+            okText={t('table.checkOut')}
+            cancelText={t('common.cancel')}
+            okButtonProps={{ danger: true }}
+            onConfirm={() => exitVisitor(v.id)}
+          >
+            <Button danger icon={<LogoutOutlined />}>
+              {t('table.checkOut')}
+            </Button>
+          </Popconfirm>
         ) : null,
     },
   ];
 
+  const pickers =
+    dateMode === 'specific' ? (
+      <DatePicker
+        size="large"
+        style={{ width: '100%' }}
+        value={singleDate}
+        onChange={(d) => d && setSingleDate(d)}
+        format="YYYY-MM-DD"
+        allowClear={false}
+      />
+    ) : dateMode === 'range' ? (
+      <RangePicker
+        size="large"
+        style={{ width: '100%' }}
+        value={dateRange as [Dayjs, Dayjs] | null}
+        onChange={(vals) => setDateRange(vals as [Dayjs | null, Dayjs | null] | null)}
+        format="YYYY-MM-DD"
+      />
+    ) : null;
+
   return (
     <Card styles={{ body: { padding: 16 } }}>
-      <Space style={{ marginBottom: 12, width: '100%', justifyContent: 'flex-end' }} size="middle" wrap>
-        <Button
-          icon={<FilePdfOutlined />}
-          onClick={handleExportPdf}
-          style={{
-            background: 'rgb(68, 114, 196)',
-            borderColor: 'rgb(68, 114, 196)',
-            color: 'white',
-          }}
-        >
-          {t('frontdesk.exportPdf')}
-        </Button>
-        <Button
-          icon={<FileExcelOutlined />}
-          onClick={handleExportExcel}
-          style={{
-            background: 'rgb(127, 188, 66)',
-            borderColor: 'rgb(127, 188, 66)',
-            color: 'white',
-          }}
-        >
-          {t('frontdesk.exportExcel')}
-        </Button>
-      </Space>
-      <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
-        <Col xs={24} md={24} lg={6}>
+      <Row gutter={[12, 12]} align="middle" style={{ marginBottom: 12 }}>
+        <Col xs={24} lg={9}>
           <Input
             size="large"
             placeholder={t('common.search')}
@@ -442,28 +383,32 @@ export default function VisitorTable() {
             allowClear
           />
         </Col>
-        <Col xs={12} sm={8} lg={3}>
+        <Col xs={12} md={8} lg={5}>
           <Select
             size="large"
             style={{ width: '100%' }}
             value={selectedFloor}
             onChange={setSelectedFloor}
-            placeholder={t('frontdesk.filterByFloor')}
+            aria-label={t('frontdesk.filterByFloor')}
             options={[
               { value: 'all', label: t('frontdesk.allFloors') },
-              { value: 1, label: `${t('visitor.floor')} 1` },
-              { value: 2, label: `${t('visitor.floor')} 2` },
-              { value: 3, label: `${t('visitor.floor')} 3` },
+              ...floors
+                .slice()
+                .sort((a, b) => a.number - b.number)
+                .map(f => ({
+                  value: f.number,
+                  label: language === 'ar' ? f.nameAr : f.name,
+                })),
             ]}
           />
         </Col>
-        <Col xs={12} sm={8} lg={4}>
+        <Col xs={12} md={8} lg={5}>
           <Select
             size="large"
             style={{ width: '100%' }}
             value={dateMode}
             onChange={(v: DateMode) => setDateMode(v)}
-            placeholder={t('frontdesk.filterByDate')}
+            aria-label={t('frontdesk.filterByDate')}
             options={[
               { value: 'today', label: t('frontdesk.today') },
               { value: 'specific', label: t('frontdesk.filterByDate') },
@@ -472,13 +417,13 @@ export default function VisitorTable() {
             ]}
           />
         </Col>
-        <Col xs={12} sm={8} lg={3}>
+        <Col xs={12} md={8} lg={5}>
           <Select
             size="large"
             style={{ width: '100%' }}
             value={periodMode}
             onChange={(v: PeriodMode) => setPeriodMode(v)}
-            placeholder={t('frontdesk.viewBy')}
+            aria-label={t('frontdesk.viewBy')}
             disabled={dateMode === 'all'}
             options={[
               { value: 'all', label: t('frontdesk.all') },
@@ -489,26 +434,23 @@ export default function VisitorTable() {
             ]}
           />
         </Col>
-        <Col xs={24} sm={24} lg={8}>
-          {dateMode === 'specific' && (
-            <DatePicker
-              size="large"
-              style={{ width: '100%' }}
-              value={singleDate}
-              onChange={(d) => d && setSingleDate(d)}
-              format="YYYY-MM-DD"
-              allowClear={false}
-            />
-          )}
-          {dateMode === 'range' && (
-            <RangePicker
-              size="large"
-              style={{ width: '100%' }}
-              value={dateRange as [Dayjs, Dayjs] | null}
-              onChange={(vals) => setDateRange(vals as [Dayjs | null, Dayjs | null] | null)}
-              format="YYYY-MM-DD"
-            />
-          )}
+      </Row>
+
+      {/* Second row: the date picker when one applies, and the exports, which
+          used to wrap onto two lines in a column too narrow for them. */}
+      <Row gutter={[12, 12]} align="middle" justify="space-between" style={{ marginBottom: 16 }}>
+        <Col xs={24} md={12} lg={9}>
+          {pickers}
+        </Col>
+        <Col xs={24} md={12} lg={15} style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Space wrap>
+            <Button size="large" icon={<FilePdfOutlined style={{ color: '#d4380d' }} />} onClick={handleExportPdf}>
+              {t('frontdesk.exportPdf')}
+            </Button>
+            <Button size="large" icon={<FileExcelOutlined style={{ color: '#1d6f42' }} />} onClick={handleExportExcel}>
+              {t('frontdesk.exportExcel')}
+            </Button>
+          </Space>
         </Col>
       </Row>
 
@@ -516,9 +458,16 @@ export default function VisitorTable() {
         columns={columns}
         dataSource={filteredVisitors}
         rowKey="id"
-        pagination={{ pageSize: 10, showSizeChanger: false }}
         size="middle"
         tableLayout="fixed"
+        scroll={{ x: 1049 }}
+        rowClassName={(v) => (v.status === 'active' ? 'visitor-row-active' : '')}
+        locale={{ emptyText: <Empty description={t('table.noVisitors')} /> }}
+        pagination={{
+          pageSize: 10,
+          showSizeChanger: false,
+          showTotal: (total) => t('table.total', { count: total }),
+        }}
       />
     </Card>
   );

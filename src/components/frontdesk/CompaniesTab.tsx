@@ -140,13 +140,13 @@ export default function CompaniesTab() {
       ),
     },
     {
-      title: t('admin.verified'),
+      title: t('employee.verified'),
       dataIndex: 'verificationStatus',
       key: 'verificationStatus',
       width: 130,
       render: (s: string) => (
         <Tag color={s === 'verified' ? 'success' : 'warning'}>
-          {s === 'verified' ? t('admin.verified') : t('admin.pending')}
+          {s === 'verified' ? t('employee.verified') : t('employee.pending')}
         </Tag>
       ),
     },
@@ -261,7 +261,7 @@ export default function CompaniesTab() {
 
       {filteredCompanies.length === 0 ? (
         <Card>
-          <Empty description="No companies found" />
+          <Empty description={t('admin.noCompaniesFound')} />
         </Card>
       ) : (
         filteredCompanies.map(renderCompanyCard)

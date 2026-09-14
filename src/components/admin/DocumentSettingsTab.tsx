@@ -46,9 +46,9 @@ export default function DocumentSettingsTab() {
       setLogoUploading(true);
       try {
         await uploadLogo(file);
-        message.success('Logo uploaded');
+        message.success(t('admin.logoUploaded'));
       } catch {
-        message.error('Failed to upload logo');
+        message.error(t('admin.logoUploadFailed'));
       } finally {
         setLogoUploading(false);
       }

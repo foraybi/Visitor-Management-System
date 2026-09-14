@@ -3,6 +3,7 @@ import { httpKioskGateway } from '../../data/kioskGateway';
 import type {
   CheckInRequest,
   CheckInSuccess,
+  CheckOutRequest,
   Directory,
   DirectoryCompany,
   DirectoryFloor,
@@ -42,7 +43,7 @@ interface KioskState {
     idNumber: string,
   ) => Promise<KioskResult<EmployeeMatch | null>>;
   checkIn: (request: CheckInRequest) => Promise<KioskResult<CheckInSuccess>>;
-  checkOut: (visitCode: string) => Promise<KioskResult<{ name: string }>>;
+  checkOut: (request: CheckOutRequest) => Promise<KioskResult<{ name: string }>>;
 }
 
 /** Swappable so tests can drive the screens through the in-memory adapter. */
@@ -79,7 +80,7 @@ export const useKioskStore = create<KioskState>()((set) => ({
 
   lookupEmployee: (idType, idNumber) => gateway.lookupEmployee(idType, idNumber),
   checkIn: (request) => gateway.checkIn(request),
-  checkOut: (visitCode) => gateway.checkOut(visitCode),
+  checkOut: (request) => gateway.checkOut(request),
 }));
 
 /**

@@ -66,7 +66,7 @@ export function exportVisitorsExcel(
   const L = { ...FALLBACK, ...labels };
 
   const rows = visitors.map(v => ({
-    [L.visitorId]: v.id,
+    [L.visitorId]: v.visitCode || v.id,
     [L.status]: v.status === 'active' ? L.active : L.exited,
     [L.name]: v.name,
     [L.phone]: v.phone,

@@ -20,6 +20,8 @@ interface AuthStore {
   currentRole: Role | null;
   currentUserId: string | null;
   currentEmail: string | null;
+  /** The profile's full name, shown in the dashboard header. */
+  currentName: string | null;
   isLoading: boolean;
   initialize: () => Promise<() => void>;
   loginWithPassword: (email: string, password: string) => Promise<string | null>;
@@ -30,24 +32,41 @@ const SIGNED_OUT = {
   currentRole: null,
   currentUserId: null,
   currentEmail: null,
+  currentName: null,
 } as const;
 
+interface StaffProfile {
+  role: Role;
+  fullName: string | null;
+}
+
 /**
- * Read the signed-in user's role from `profiles`.
+ * Read the signed-in user's role and name from `profiles`.
  *
- * Returns null when there is no row or the value is not a role we recognise.
+ * Returns null when there is no row or the role is not one we recognise.
  * Failing closed matters: an unreadable profile must not fall back to any
  * access at all.
  */
-async function fetchRole(userId: string): Promise<Role | null> {
+async function fetchProfile(userId: string): Promise<StaffProfile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, full_name')
     .eq('id', userId)
     .maybeSingle();
 
-  if (error || !data) return null;
-  return isRole(data.role) ? data.role : null;
+  if (error || !data || !isRole(data.role)) return null;
+  return { role: data.role, fullName: data.full_name ?? null };
+}
+
+function signedIn(userId: string, email: string | undefined, profile: StaffProfile | null) {
+  return profile
+    ? {
+        currentRole: profile.role,
+        currentUserId: userId,
+        currentEmail: email ?? null,
+        currentName: profile.fullName,
+      }
+    : { ...SIGNED_OUT };
 }
 
 export const useAuthStore = create<AuthStore>()((set) => ({
@@ -68,13 +87,8 @@ export const useAuthStore = create<AuthStore>()((set) => ({
     } = await supabase.auth.getSession();
 
     if (session?.user) {
-      const role = await fetchRole(session.user.id);
-      set({
-        currentRole: role,
-        currentUserId: role ? session.user.id : null,
-        currentEmail: role ? (session.user.email ?? null) : null,
-        isLoading: false,
-      });
+      const profile = await fetchProfile(session.user.id);
+      set({ ...signedIn(session.user.id, session.user.email, profile), isLoading: false });
     } else {
       set({ ...SIGNED_OUT, isLoading: false });
     }
@@ -88,13 +102,8 @@ export const useAuthStore = create<AuthStore>()((set) => ({
       }
       if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
         const user = next.user;
-        void fetchRole(user.id).then((role) => {
-          set({
-            currentRole: role,
-            currentUserId: role ? user.id : null,
-            currentEmail: role ? (user.email ?? null) : null,
-            isLoading: false,
-          });
+        void fetchProfile(user.id).then((profile) => {
+          set({ ...signedIn(user.id, user.email, profile), isLoading: false });
         });
       }
     });
@@ -117,15 +126,15 @@ export const useAuthStore = create<AuthStore>()((set) => ({
     const user = data.user;
     if (!user) return 'Sign in failed. Try again.';
 
-    const role = await fetchRole(user.id);
-    if (!role) {
+    const profile = await fetchProfile(user.id);
+    if (!profile) {
       // Authenticated but not staff, or the profile row was removed. Do not
       // leave a usable session behind.
       await supabase.auth.signOut();
       return 'This account has no access. Ask an administrator to set it up.';
     }
 
-    set({ currentRole: role, currentUserId: user.id, currentEmail: user.email ?? null });
+    set(signedIn(user.id, user.email, profile));
     return null;
   },
 

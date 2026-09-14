@@ -95,22 +95,28 @@ describe('the kiosk gateway contract', () => {
       const gateway = inMemoryKioskGateway();
       await gateway.checkIn(checkIn({ name: 'Sara' }));
 
-      expect(await gateway.checkOut('0001')).toEqual({ ok: true, value: { name: 'Sara' } });
+      expect(await gateway.checkOut({ visitCode: '0001' })).toEqual({
+        ok: true,
+        value: { name: 'Sara' },
+      });
     });
 
     it('accepts a code typed without leading zeros', async () => {
       const gateway = inMemoryKioskGateway();
       await gateway.checkIn(checkIn());
 
-      expect((await gateway.checkOut('1')).ok).toBe(true);
+      expect((await gateway.checkOut({ visitCode: '1' })).ok).toBe(true);
     });
 
     it('refuses to close the same visit twice', async () => {
       const gateway = inMemoryKioskGateway();
       await gateway.checkIn(checkIn());
-      await gateway.checkOut('0001');
+      await gateway.checkOut({ visitCode: '0001' });
 
-      expect(await gateway.checkOut('0001')).toEqual({ ok: false, error: 'no_active_visit' });
+      expect(await gateway.checkOut({ visitCode: '0001' })).toEqual({
+        ok: false,
+        error: 'no_active_visit',
+      });
     });
 
     // Codes repeat across days, so a code must only ever close a visit opened
@@ -120,7 +126,66 @@ describe('the kiosk gateway contract', () => {
       await gateway.checkIn(checkIn());
       gateway.nextDay();
 
-      expect(await gateway.checkOut('0001')).toEqual({ ok: false, error: 'no_active_visit' });
+      expect(await gateway.checkOut({ visitCode: '0001' })).toEqual({
+        ok: false,
+        error: 'no_active_visit',
+      });
+    });
+  });
+
+  // Employees are never shown a visit code, so without this they had no way to
+  // check out at the tablet and their attendance never got an exit time.
+  describe('employee check-out by identity number', () => {
+    const employeeVisit = () =>
+      checkIn({ visitorType: 'employee', name: 'Noura', nationalityIdNumber: '1029384756' });
+
+    it('closes today\'s open employee visit', async () => {
+      const gateway = inMemoryKioskGateway();
+      await gateway.checkIn(employeeVisit());
+
+      expect(
+        await gateway.checkOut({ idType: 'national_id', idNumber: '1029384756' }),
+      ).toEqual({ ok: true, value: { name: 'Noura' } });
+      expect(gateway.visits[0].open).toBe(false);
+    });
+
+    it('matches Arabic-Indic digits typed on the tablet keyboard', async () => {
+      const gateway = inMemoryKioskGateway();
+      await gateway.checkIn(employeeVisit());
+
+      expect(
+        (await gateway.checkOut({ idType: 'national_id', idNumber: '١٠٢٩٣٨٤٧٥٦' })).ok,
+      ).toBe(true);
+    });
+
+    // A visitor's identity number must not close their visit: only the code on
+    // their card does, so someone who overhears an ID cannot check them out.
+    it('will not close a visitor\'s visit by identity number', async () => {
+      const gateway = inMemoryKioskGateway();
+      await gateway.checkIn(checkIn({ nationalityIdNumber: '1029384756' }));
+
+      expect(
+        await gateway.checkOut({ idType: 'national_id', idNumber: '1029384756' }),
+      ).toEqual({ ok: false, error: 'no_active_visit' });
+    });
+
+    it('will not close yesterday\'s visit', async () => {
+      const gateway = inMemoryKioskGateway();
+      await gateway.checkIn(employeeVisit());
+      gateway.nextDay();
+
+      expect(
+        await gateway.checkOut({ idType: 'national_id', idNumber: '1029384756' }),
+      ).toEqual({ ok: false, error: 'no_active_visit' });
+    });
+
+    it('rejects a malformed identity number', async () => {
+      const gateway = inMemoryKioskGateway();
+
+      expect(await gateway.checkOut({ idType: 'national_id', idNumber: '99' })).toEqual({
+        ok: false,
+        error: 'invalid_identity',
+      });
     });
   });
 
@@ -179,6 +244,17 @@ describe('the http adapter', () => {
     expect(headers['x-kiosk-token']).toBe('a'.repeat(40));
     // Nothing resembling a database credential may leave the tablet.
     expect(JSON.stringify(headers)).not.toMatch(/apikey|authorization|supabase/i);
+  });
+
+  it('sends an employee check-out as identity type and number', async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ name: 'Noura' }), { status: 200 }));
+    const gateway = httpKioskGateway({ token, fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    await gateway.checkOut({ idType: 'iqama', idNumber: '2000000002' });
+
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('/api/kiosk/check-out');
+    expect(JSON.parse(init.body as string)).toEqual({ idType: 'iqama', idNumber: '2000000002' });
   });
 
   it('refuses to call at all when the tablet has no token', async () => {

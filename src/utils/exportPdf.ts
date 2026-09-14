@@ -217,7 +217,7 @@ export async function exportVisitorsPdf(
   ];
 
   const rows = visitors.map(v => [
-    v.id,
+    v.visitCode || v.id,
     v.status === 'active' ? L.active : L.exited,
     v.name,
     v.phone,

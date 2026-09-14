@@ -2,6 +2,7 @@ import { parseIdentityNumber } from '../domain/identity/identity';
 import type {
   CheckInRequest,
   CheckInSuccess,
+  CheckOutRequest,
   Directory,
   EmployeeMatch,
   KioskGateway,
@@ -109,15 +110,34 @@ export function inMemoryKioskGateway(options: InMemoryOptions = {}): InMemoryKio
       if (!company) return { ok: false, error: 'unknown_company' };
 
       const value: CheckInSuccess = { visitCode: allocateCode(), floor: company.floor };
-      visits.push({ ...request, ...value, open: true, day });
+      // Stored normalised, as the server stores it, so check-out by identity
+      // number matches however the digits were typed.
+      visits.push({ ...request, nationalityIdNumber: parsed.value, ...value, open: true, day });
       return { ok: true, value };
     },
 
-    async checkOut(visitCode) {
+    async checkOut(request: CheckOutRequest) {
       const blocked = guard<{ name: string }>();
       if (blocked) return blocked;
 
-      const code = visitCode.trim().padStart(4, '0');
+      if ('idNumber' in request) {
+        const parsed = parseIdentityNumber(request.idType, request.idNumber);
+        if (!parsed.ok) return { ok: false, error: 'invalid_identity' };
+
+        const open = visits.filter(
+          (v) =>
+            v.visitorType === 'employee' &&
+            v.nationalityIdNumber === parsed.value &&
+            v.day === day &&
+            v.open,
+        );
+        if (open.length === 0) return { ok: false, error: 'no_active_visit' };
+
+        for (const visit of open) visit.open = false;
+        return { ok: true, value: { name: open[0].name } };
+      }
+
+      const code = request.visitCode.trim().padStart(4, '0');
       const visit = visits.find((v) => v.visitCode === code && v.day === day && v.open);
       if (!visit) return { ok: false, error: 'no_active_visit' };
 

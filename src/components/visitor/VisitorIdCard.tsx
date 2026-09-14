@@ -33,7 +33,7 @@ export default function VisitorIdCard({ visitorId, onClose }: VisitorIdCardProps
       footer={null}
       closable={false}
       centered
-      width={440}
+      width="min(480px, 94vw)"
       styles={{
         body: { padding: 0 },
       }}

@@ -15,6 +15,8 @@ export interface FloorInfo {
 
 export interface Visitor {
   id: string;
+  /** The four-digit code on the visitor card. Unique within a day. */
+  visitCode: string;
   name: string;
   phone: string;
   email?: string;

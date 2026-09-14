@@ -31,7 +31,11 @@ import {
   useKioskFieldVisible,
   useKioskStore,
 } from '../../app/kiosk/kioskStore';
-import { identityLabelKey } from '../../domain/identity/identity';
+import {
+  identityLabelKey,
+  inferIdentityType,
+  parseIdentityNumber,
+} from '../../domain/identity/identity';
 import { countries } from '../../utils/countryData';
 import VisitorIdCard from './VisitorIdCard';
 import EmployeeWelcomeCard from './EmployeeWelcomeCard';
@@ -196,7 +200,11 @@ export default function EnterForm({ onClose }: EnterFormProps) {
       if (values.visitorType === 'employee') {
         // The tablet no longer holds the employee directory, so recognition
         // happens server-side and returns one display name.
-        const found = await lookupEmployee(values.nationalityType, values.nationalityIdNumber);
+        // The employee screen asks for one number rather than a type and a
+        // number, so the type comes from the number's shape. The lookup used to
+        // send no type at all, and the server refused every employee check-in.
+        const idType = inferIdentityType(values.nationalityIdNumber);
+        const found = await lookupEmployee(idType, values.nationalityIdNumber);
         if (!found.ok) {
           message.error(t(kioskErrorKey(found.error)));
           return;
@@ -217,7 +225,7 @@ export default function EnterForm({ onClose }: EnterFormProps) {
           visitorType: 'employee',
           name: employee.name,
           phone: '',
-          nationalityType: values.nationalityType,
+          nationalityType: idType,
           nationalityIdNumber: values.nationalityIdNumber,
           countryCode: 'SA',
           countryName: '',
@@ -292,13 +300,21 @@ export default function EnterForm({ onClose }: EnterFormProps) {
   return (
     <div
       style={{
-        minHeight: '100vh',
-        padding: '24px 16px',
+        minHeight: '100dvh',
+        padding: 'clamp(12px, 2.5vw, 28px) clamp(12px, 2.5vw, 28px) 24px',
         background: '#ffffff',
       }}
       className="floating-orbs"
+      // A tablet's on-screen keyboard covers the lower half of the screen. Bring
+      // the field being typed into to the middle once the keyboard has opened.
+      onFocusCapture={(e) => {
+        const field = e.target as HTMLElement;
+        if (field.matches('input, textarea')) {
+          window.setTimeout(() => field.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300);
+        }
+      }}
     >
-      <div style={{ maxWidth: 960, margin: '0 auto' }}>
+      <div style={{ maxWidth: 1080, margin: '0 auto' }}>
         {/* Header */}
         <Card style={{ marginBottom: 16 }} styles={{ body: { padding: 24 } }}>
           <Space style={{ width: '100%', justifyContent: 'space-between' }} wrap>
@@ -338,7 +354,7 @@ export default function EnterForm({ onClose }: EnterFormProps) {
             }
           >
             <Row gutter={[16, 0]}>
-              <Col xs={24} md={12}>
+              <Col xs={24} lg={12}>
                 <Form.Item
                   label={t('visitor.visitorType')}
                   name="visitorType"
@@ -367,7 +383,7 @@ export default function EnterForm({ onClose }: EnterFormProps) {
                   />
                 </Form.Item>
               </Col>
-              <Col xs={24} md={12}>
+              <Col xs={24} lg={12}>
                 <Form.Item
                   label={t('visitor.company')}
                   name="visitedCompanyId"
@@ -422,27 +438,26 @@ export default function EnterForm({ onClose }: EnterFormProps) {
                     label={t('visitor.employeeIdNumberLabel')}
                     name="nationalityIdNumber"
                     rules={[
-                      { required: true, message: t('common.required') },
-                      { pattern: /^\d+$/, message: t('visitor.validation.nationalIdFormat') },
-                      { min: 4 },
+                      {
+                        // Validated with the same rules the server applies, so a
+                        // typo is caught here instead of as a failed check-in.
+                        validator: (_, value: string | undefined) => {
+                          if (!value?.trim()) return Promise.reject(new Error(t('common.required')));
+                          return parseIdentityNumber(inferIdentityType(value), value).ok
+                            ? Promise.resolve()
+                            : Promise.reject(new Error(t('visitor.errors.invalid_identity')));
+                        },
+                      },
                     ]}
                   >
                     <Input
                       ref={empPhoneRef}
                       size="large"
-                      type="tel"
-                      inputMode="numeric"
                       placeholder={t('visitor.employeeIdNumberPlaceholder')}
                       maxLength={20}
                       autoFocus
-                      onKeyDown={(e) => {
-                        if (
-                          !/^[0-9]$/.test(e.key) &&
-                          !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End', 'Enter'].includes(e.key)
-                        ) {
-                          e.preventDefault();
-                        }
-                      }}
+                      autoComplete="off"
+                      prefix={<IdcardOutlined style={{ color: 'rgba(0,0,0,0.45)' }} />}
                     />
                   </Form.Item>
                 </Col>
@@ -542,7 +557,7 @@ export default function EnterForm({ onClose }: EnterFormProps) {
                   </Col>
                 )}
 
-                <Col xs={24} md={12}>
+                <Col xs={24} lg={12}>
                   <Form.Item
                     label={t('visitor.nationalityType')}
                     name="nationalityType"
@@ -570,7 +585,7 @@ export default function EnterForm({ onClose }: EnterFormProps) {
                     />
                   </Form.Item>
                 </Col>
-                <Col xs={24} md={12}>
+                <Col xs={24} lg={12}>
                   <Form.Item
                     label={t('visitor.nationalityId')}
                     name="nationalityIdNumber"
@@ -675,7 +690,9 @@ export default function EnterForm({ onClose }: EnterFormProps) {
           )}
 
           {/* ─── Terms + Submit ─── */}
-          <Card styles={{ body: { padding: 16 } }}>
+          {/* Sticky, so the submit button is reachable without scrolling back
+              down on a tablet held upright. */}
+          <Card className="kiosk-submit-bar" styles={{ body: { padding: 16 } }}>
             <Form.Item
               name="agreedToTerms"
               valuePropName="checked"
