@@ -47,8 +47,8 @@ export default function MainScreen() {
       style={{ borderTop: `6px solid ${color}` }}
       styles={{
         body: {
-          padding: 'clamp(24px, 4vw, 48px)',
-          minHeight: 'clamp(220px, 30vw, 320px)',
+          padding: 'clamp(16px, min(3vw, 4vh), 40px)',
+          minHeight: 'clamp(150px, min(24vw, 30vh), 280px)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -56,13 +56,13 @@ export default function MainScreen() {
         },
       }}
     >
-      <div style={{ fontSize: 'clamp(64px, 9vw, 104px)', color, lineHeight: 1, marginBottom: 16 }}>
+      <div style={{ fontSize: 'clamp(44px, min(7vw, 11vh), 92px)', color, lineHeight: 1, marginBottom: 'clamp(8px, 1.6vh, 16px)' }}>
         {icon}
       </div>
-      <Title level={2} style={{ color, margin: 0, fontSize: 'clamp(28px, 3.6vw, 40px)' }}>
+      <Title level={2} style={{ color, margin: 0, fontSize: 'clamp(22px, min(3vw, 4.6vh), 36px)' }}>
         {title}
       </Title>
-      <Paragraph style={{ color: '#6b7280', margin: '8px 0 0', fontSize: 'clamp(16px, 1.8vw, 20px)' }}>
+      <Paragraph style={{ color: '#6b7280', margin: '6px 0 0', fontSize: 'clamp(14px, min(1.6vw, 2.4vh), 18px)' }}>
         {subtitle}
       </Paragraph>
     </Card>
@@ -70,8 +70,8 @@ export default function MainScreen() {
 
   return (
     <div className="floating-orbs kiosk-screen">
-      <div className="flex justify-between items-center" style={{ padding: 'clamp(16px, 3vw, 28px)', gap: 16 }}>
-        <Title level={2} style={{ color: 'rgb(0, 114, 151)', margin: 0, fontSize: 'clamp(22px, 3vw, 32px)' }}>
+      <div className="flex justify-between items-center" style={{ padding: 'clamp(12px, min(2.4vw, 3vh), 24px)', gap: 16 }}>
+        <Title level={2} style={{ color: 'rgb(0, 114, 151)', margin: 0, fontSize: 'clamp(18px, min(2.4vw, 3.6vh), 28px)' }}>
           {t('common.appName')}
         </Title>
         <Button
@@ -79,7 +79,7 @@ export default function MainScreen() {
           icon={<GlobalOutlined />}
           onClick={toggleLanguage}
           size="large"
-          style={{ minHeight: 52, paddingInline: 20, fontSize: 18 }}
+          style={{ minHeight: 44, paddingInline: 18, fontSize: 16 }}
         >
           {language === 'ar' ? 'English' : 'العربية'}
         </Button>
@@ -90,8 +90,8 @@ export default function MainScreen() {
           level={1}
           style={{
             color: 'rgb(0, 114, 151)',
-            fontSize: 'clamp(34px, 6vw, 64px)',
-            marginBottom: 'clamp(24px, 5vw, 56px)',
+            fontSize: 'clamp(26px, min(5vw, 7.5vh), 56px)',
+            marginBottom: 'clamp(16px, min(4vw, 5vh), 48px)',
             textAlign: 'center',
           }}
         >

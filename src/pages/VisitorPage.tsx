@@ -94,12 +94,22 @@ export default function VisitorPage() {
       }
     };
 
+    // Android's back button and back gesture close an installed kiosk app when
+    // there is no page to go back to. A spare history entry absorbs the press,
+    // and is put back each time, so the visitor stays on the check-in screen.
+    // This does not replace screen pinning: the home and recent-apps buttons
+    // can only be locked by the device itself.
+    const keepHistoryEntry = () => window.history.pushState({ kiosk: true }, '', window.location.href);
+    keepHistoryEntry();
+
     window.addEventListener('keydown', onKeyDown, true);
     window.addEventListener('contextmenu', onContextMenu);
     window.addEventListener('beforeunload', onBeforeUnload);
+    window.addEventListener('popstate', keepHistoryEntry);
     document.addEventListener('fullscreenchange', onFullscreenChange);
 
     return () => {
+      window.removeEventListener('popstate', keepHistoryEntry);
       window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('contextmenu', onContextMenu);
       window.removeEventListener('beforeunload', onBeforeUnload);

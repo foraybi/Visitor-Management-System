@@ -7,7 +7,6 @@ import {
   Radio,
   Button,
   Space,
-  Divider,
   Typography,
   Row,
   Col,
@@ -316,13 +315,13 @@ export default function EnterForm({ onClose }: EnterFormProps) {
     >
       <div style={{ maxWidth: 1080, margin: '0 auto' }}>
         {/* Header */}
-        <Card style={{ marginBottom: 16 }} styles={{ body: { padding: 24 } }}>
+        <Card style={{ marginBottom: 12 }} styles={{ body: { padding: 'clamp(10px, 2vh, 20px) clamp(14px, 2vw, 24px)' } }}>
           <Space style={{ width: '100%', justifyContent: 'space-between' }} wrap>
             <div>
-              <Title level={2} style={{ color: 'rgb(0, 114, 151)', margin: 0 }}>
+              <Title level={2} style={{ color: 'rgb(0, 114, 151)', margin: 0, fontSize: 'clamp(20px, min(2.6vw, 4vh), 30px)' }}>
                 {t('visitor.checkInHeading')}
               </Title>
-              <Text type="secondary" style={{ fontSize: 16 }}>
+              <Text type="secondary" style={{ fontSize: 'clamp(13px, min(1.4vw, 2.2vh), 16px)' }}>
                 {t('visitor.enterTitle')}
               </Text>
             </div>
@@ -330,7 +329,6 @@ export default function EnterForm({ onClose }: EnterFormProps) {
               {t('common.back')}
             </Button>
           </Space>
-          <Divider style={{ margin: '16px 0 0' }} />
         </Card>
 
         <Form
