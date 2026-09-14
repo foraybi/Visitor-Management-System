@@ -22,6 +22,7 @@
 
 import { createHash, randomBytes } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
+import QRCode from 'qrcode';
 
 const url = process.env.SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -97,11 +98,27 @@ async function provision(label) {
   console.log(`    ${token}`);
   console.log('');
   const kioskUrl = (process.env.KIOSK_URL ?? 'https://kiosk.example.com').replace(/\/+$/, '');
+  const link = `${kioskUrl}/#device-token=${token}`;
   console.log('  On the tablet, open this link once. It registers the tablet and removes');
   console.log('  the token from the address bar. Set KIOSK_URL to print your real domain.');
   console.log('');
-  console.log(`    ${kioskUrl}/#device-token=${token}`);
+  console.log(`    ${link}`);
   console.log('');
+
+  // Typing a 64-character token on a tablet is not realistic, so the link is
+  // also drawn as a QR code for the tablet's camera. Only with a real KIOSK_URL:
+  // a code for the placeholder domain would register nothing.
+  if (process.env.KIOSK_URL) {
+    const qr = await QRCode.toString(link, { type: 'terminal', small: true, errorCorrectionLevel: 'L' });
+    console.log('  Or scan this with the tablet camera, then open the link it shows:');
+    console.log('');
+    console.log(qr.replace(/^/gm, '    '));
+    console.log('  The code carries the token: do not photograph it or leave it on screen.');
+    console.log('');
+  } else {
+    console.log('  Set KIOSK_URL to also get a QR code the tablet can scan.');
+    console.log('');
+  }
   console.log('  Then install it to the home screen. Revoke this device with:');
   console.log('');
   console.log(`    node scripts/provision-kiosk-device.mjs --revoke ${data.id}`);

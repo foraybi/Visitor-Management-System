@@ -322,11 +322,14 @@ node --env-file=.env scripts/provision-kiosk-device.mjs --revoke <device-id>
    address the tablet will use: your kiosk domain in production,
    `http://<computer's Wi-Fi address>:5174` with `npm run dev:all`, or
    `http://localhost:4174` with `npm run preview:kiosk`.
-2. It prints a registration link, `<KIOSK_URL>/#device-token=<token>`, once. The
-   database stores only a hash of the token, so a lost link cannot be recovered:
-   revoke that device and provision a new one.
-3. Open the link on the tablet, in the browser the kiosk will run in. The token is
-   saved on the tablet and removed from the address bar.
+2. It prints a registration link, `<KIOSK_URL>/#device-token=<token>`, once, and
+   draws the same link as a QR code in the terminal. The database stores only a
+   hash of the token, so a lost link cannot be recovered: revoke that device and
+   provision a new one. The QR code carries the token, so do not photograph it or
+   leave it on screen.
+3. On the tablet, scan the QR code with the camera and open the link, or type the
+   link. Use the browser the kiosk will run in. The token is saved on the tablet
+   and removed from the address bar.
 4. On Android, install it from Chrome (see [Installing the kiosk as an
    app](#installing-the-kiosk-as-an-app)). On an iPad, keep it in Safari.
 5. Lock the tablet: Guided Access on an iPad, screen pinning or a managed kiosk
