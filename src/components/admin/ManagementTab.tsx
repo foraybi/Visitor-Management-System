@@ -16,6 +16,7 @@ import {
   Row,
   Col,
   DatePicker,
+  Drawer,
   InputNumber,
   Upload,
   Image as AntImage,
@@ -34,7 +35,7 @@ import {
   FileExcelOutlined,
 } from '@ant-design/icons';
 import ImportCompaniesModal from './ImportCompaniesModal';
-import { capacityFor } from '../../domain/incubation/capacity';
+import CompanyDirectory from '../staff/CompanyDirectory';
 import type { ColumnsType } from 'antd/es/table';
 import type { UploadProps } from 'antd';
 import dayjs from 'dayjs';
@@ -45,7 +46,6 @@ import { useCompanyStore } from '../../store/companyStore';
 import { useFloorStore } from '../../store/floorStore';
 import { useVisitorStore } from '../../store/visitorStore';
 import { useUIStore } from '../../store/uiStore';
-import { generateEmployeeNumber } from '../../utils/idGenerator';
 import { countries } from '../../utils/countryData';
 import { formatTimeFromISO } from '../../utils/timeUtils';
 import type { Company, Employee, NationalityType, StaffProfile } from '../../types';
@@ -129,23 +129,7 @@ export default function ManagementTab() {
   };
 
   // ─── Employee handlers ───
-  const openAddEmployee = (companyId: string) => {
-    setSelectedCompanyId(companyId);
-    setEditingEmployee(null);
-    setPhotoDataUrl('');
-    setPhotoFile(null);
-    setEmpNationalityType(null);
-    employeeForm.resetFields();
-    const allNumbers = companies.flatMap(c => c.employees.map(e => e.employeeNumber));
-    employeeForm.setFieldsValue({
-      employeeNumber: generateEmployeeNumber(allNumbers),
-      employmentStatus: 'active',
-      jobType: 'full_time',
-      countryCode: 'SA',
-      employeeType: 'employee',
-    });
-    setEmployeeModalOpen(true);
-  };
+  // Adding a person happens from the company table, through the shared form.
 
   const openEditEmployee = (employee: Employee, companyId: string) => {
     setEditingEmployee({ employee, companyId });
@@ -217,74 +201,6 @@ export default function ManagementTab() {
   const presence = useMemo(() => presenceIndex(visitors), [visitors]);
 
   // ─── Tables ───
-  const companyColumns: ColumnsType<Company> = [
-    { title: t('company.name'), dataIndex: 'name', key: 'name' },
-    { title: t('company.nameAr'), dataIndex: 'nameAr', key: 'nameAr' },
-    {
-      title: t('visitor.floor'),
-      dataIndex: 'floor',
-      key: 'floor',
-      render: floor => <Tag color="cyan">{t('visitor.floor')} {floor}</Tag>,
-    },
-    { title: t('table.phone'), dataIndex: 'phone', key: 'phone' },
-    {
-      title: t('incubation.crNumber'),
-      dataIndex: 'crNumber',
-      key: 'crNumber',
-      render: (cr?: string) => <span dir="ltr">{cr || '—'}</span>,
-    },
-    {
-      title: t('incubation.founders'),
-      key: 'founders',
-      render: (_, record) => {
-        const c = capacityFor(record, 'founder');
-        return <Tag color={c.full ? 'error' : undefined}>{c.limit === null ? c.used : `${c.used} / ${c.limit}`}</Tag>;
-      },
-    },
-    {
-      title: t('incubation.employees'),
-      key: 'employees',
-      render: (_, record) => {
-        const c = capacityFor(record, 'employee');
-        return <Tag color={c.full ? 'error' : undefined}>{c.limit === null ? c.used : `${c.used} / ${c.limit}`}</Tag>;
-      },
-    },
-    {
-      title: t('incubation.period'),
-      key: 'period',
-      render: (_, record) =>
-        record.incubationStart || record.incubationEnd ? (
-          <span dir="ltr">{record.incubationStart ?? '…'} → {record.incubationEnd ?? '…'}</span>
-        ) : (
-          '—'
-        ),
-    },
-    {
-      title: t('table.actions'),
-      key: 'actions',
-      render: (_, record) => (
-        <Space>
-          <Button size="small" icon={<PlusOutlined />} onClick={() => openAddEmployee(record.id)}>
-            {t('admin.addEmployee')}
-          </Button>
-          <Button size="small" icon={<EditOutlined />} onClick={() => openEditCompany(record)}>
-            {t('common.edit')}
-          </Button>
-          <Popconfirm
-            title={t('admin.deleteCompanyConfirm')}
-            description={t('common.cannotUndo')}
-            okText={t('common.delete')}
-            cancelText={t('common.cancel')}
-            okButtonProps={{ danger: true }}
-            onConfirm={() => deleteCompany(record.id)}
-          >
-            <Button size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
-
   const allEmployees = companies.flatMap(c =>
     c.employees.map(e => ({ ...e, companyName: c.name, companyNameAr: c.nameAr, companyId: c.id }))
   );
@@ -692,22 +608,24 @@ export default function ManagementTab() {
             key: 'companies',
             label: t('frontdesk.companies'),
             children: (
-              <Card
-                title={<Title level={4} style={{ margin: 0 }}>{t('frontdesk.companies')}</Title>}
-                extra={
-                  <Space wrap>
-                    <Button icon={<FileExcelOutlined />} onClick={() => setImportOpen(true)}>
-                      {t('incubation.importButton')}
-                    </Button>
-                    <Button type="primary" icon={<PlusOutlined />} onClick={openAddCompany}>
-                      {t('company.addCompany')}
-                    </Button>
-                  </Space>
-                }
-              >
-                <Table columns={companyColumns} dataSource={companies} rowKey="id" pagination={{ pageSize: 10 }} scroll={{ x: 1300 }} />
+              <>
+                <CompanyDirectory
+                  toolbarExtra={
+                    <>
+                      <Button icon={<FileExcelOutlined />} onClick={() => setImportOpen(true)}>
+                        {t('incubation.importButton')}
+                      </Button>
+                      <Button type="primary" icon={<PlusOutlined />} onClick={openAddCompany}>
+                        {t('company.addCompany')}
+                      </Button>
+                    </>
+                  }
+                  onEditCompany={openEditCompany}
+                  onDeleteCompany={company => deleteCompany(company.id)}
+                  onEditEmployee={openEditEmployee}
+                />
                 <ImportCompaniesModal open={importOpen} onClose={() => setImportOpen(false)} />
-              </Card>
+              </>
             ),
           },
           {
@@ -756,60 +674,89 @@ export default function ManagementTab() {
         ]}
       />
 
-      {/* Company Modal */}
-      <Modal
+      {/* Company form, in a side panel with the table still in view */}
+      <Drawer
         open={companyModalOpen}
-        title={editingCompany ? t('company.editCompany') : t('company.addCompany')}
-        onCancel={() => setCompanyModalOpen(false)}
-        footer={null}
-        centered
-        destroyOnClose
+        onClose={() => setCompanyModalOpen(false)}
+        destroyOnHidden
+        placement={language === 'ar' ? 'left' : 'right'}
+        size="min(560px, 100vw)"
+        title={
+          <div>
+            <div>{editingCompany ? t('company.editCompany') : t('company.addCompany')}</div>
+            {editingCompany && (
+              <div className="drawer-subtitle">{language === 'ar' ? editingCompany.nameAr : editingCompany.name}</div>
+            )}
+          </div>
+        }
+        footer={
+          <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+            <Button onClick={() => setCompanyModalOpen(false)}>{t('common.cancel')}</Button>
+            <Button type="primary" onClick={() => companyForm.submit()}>{t('common.save')}</Button>
+          </Space>
+        }
       >
-        <Form form={companyForm} layout="vertical" onFinish={handleCompanySubmit} requiredMark={false} style={{ marginTop: 16 }}>
-          <Form.Item label={t('company.name')} name="name" rules={[{ required: true }]}>
-            <Input size="large" />
-          </Form.Item>
-          <Form.Item label={t('company.nameAr')} name="nameAr" rules={[{ required: true }]}>
-            <Input size="large" />
-          </Form.Item>
-          <Form.Item label={t('company.phone')} name="phone" rules={[{ required: true }]}>
-            <Input size="large" />
-          </Form.Item>
-          <Form.Item label={t('visitor.floor')} name="floor" rules={[{ required: true }]}>
-            <Select
-              size="large"
-              options={floors.slice().sort((a, b) => a.number - b.number).map(f => ({
-                value: f.number,
-                label: `${f.name} (${t('visitor.floor')} ${f.number})`,
-              }))}
-            />
-          </Form.Item>
-          <Form.Item label={t('incubation.crNumber')} name="crNumber" rules={[{ pattern: /^\d{5,20}$/ }]}>
-            <Input size="large" inputMode="numeric" maxLength={20} dir="ltr" />
-          </Form.Item>
-          <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item label={t('incubation.foundersLimit')} name="foundersLimit" extra={t('incubation.noLimit')}>
-                <InputNumber size="large" min={0} max={1000} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label={t('incubation.employeesLimit')} name="employeesLimit" extra={t('incubation.noLimit')}>
-                <InputNumber size="large" min={0} max={100000} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item label={t('incubation.period')} name="incubationPeriod">
-            <DatePicker.RangePicker size="large" style={{ width: '100%' }} format="YYYY-MM-DD" allowEmpty={[true, true]} />
-          </Form.Item>
-          <Form.Item style={{ marginBottom: 0 }}>
-            <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
-              <Button onClick={() => setCompanyModalOpen(false)}>{t('common.cancel')}</Button>
-              <Button type="primary" htmlType="submit">{t('common.save')}</Button>
-            </Space>
-          </Form.Item>
+        <Form form={companyForm} layout="vertical" onFinish={handleCompanySubmit} requiredMark={false} className="panel-form">
+          <section className="form-section">
+            <div className="form-section-title">{t('incubation.companySection')}</div>
+            <Row gutter={12}>
+              <Col xs={24} sm={12}>
+                <Form.Item label={t('company.nameAr')} name="nameAr" rules={[{ required: true, message: t('common.required') }]}>
+                  <Input size="large" dir="rtl" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item label={t('company.name')} name="name" rules={[{ required: true, message: t('common.required') }]}>
+                  <Input size="large" dir="ltr" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item label={t('incubation.crNumber')} name="crNumber" rules={[{ pattern: /^\d{5,20}$/ }]}>
+                  <Input size="large" inputMode="numeric" maxLength={20} dir="ltr" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item label={t('company.phone')} name="phone" rules={[{ required: true, message: t('common.required') }]}>
+                  <Input size="large" inputMode="tel" dir="ltr" />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Form.Item label={t('visitor.floor')} name="floor" rules={[{ required: true, message: t('common.required') }]} style={{ marginBottom: 0 }}>
+              <Select
+                size="large"
+                options={floors.slice().sort((a, b) => a.number - b.number).map(f => ({
+                  value: f.number,
+                  label: language === 'ar' ? f.nameAr : f.name,
+                }))}
+              />
+            </Form.Item>
+          </section>
+
+          <section className="form-section">
+            <div className="form-section-title">{t('incubation.placesSection')}</div>
+            <Row gutter={12}>
+              <Col span={12}>
+                <Form.Item label={t('incubation.founders')} name="foundersLimit">
+                  <InputNumber size="large" min={0} max={1000} placeholder={t('incubation.noLimit')} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label={t('incubation.employees')} name="employeesLimit">
+                  <InputNumber size="large" min={0} max={100000} placeholder={t('incubation.noLimit')} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Typography.Text type="secondary" className="form-section-hint">{t('incubation.placesHint')}</Typography.Text>
+          </section>
+
+          <section className="form-section">
+            <div className="form-section-title">{t('incubation.period')}</div>
+            <Form.Item name="incubationPeriod" style={{ marginBottom: 0 }}>
+              <DatePicker.RangePicker size="large" style={{ width: '100%' }} format="YYYY-MM-DD" allowEmpty={[true, true]} />
+            </Form.Item>
+          </section>
         </Form>
-      </Modal>
+      </Drawer>
 
       {/* Staff Account Modal */}
       <Modal
