@@ -1,42 +1,33 @@
 import { json } from '../_lib/http.js';
-import { kioskHandler } from '../_lib/kiosk.js';
-import { serviceClient } from '../_lib/supabaseAdmin.js';
+import { kioskHandler, kioskRpc } from '../_lib/kiosk.js';
 
 /**
  * The company and floor picker, plus which check-in fields to show.
  *
  * Returns only what the picker renders. The kiosk used to load the entire
- * employee directory onto the tablet to draw this list.
+ * employee directory onto the tablet to draw this list. One database call,
+ * kiosk_directory, checks the tablet and returns all three lists together.
  */
-export const handleDirectory = kioskHandler(async () => {
-  const supabase = serviceClient();
 
-  const [companies, floors, formConfig] = await Promise.all([
-    supabase.from('companies').select('id, name, name_ar, floor').order('name'),
-    supabase.from('floors').select('number, name, name_ar, image_url').order('number'),
-    supabase.from('form_config').select('fields').eq('id', 1).maybeSingle(),
-  ]);
+interface Directory {
+  companies: Array<{ id: string; name: string; nameAr: string; floor: number }>;
+  floors: Array<{ number: number; name: string; nameAr: string; imageUrl: string }>;
+  formFields: unknown;
+}
 
-  if (companies.error || floors.error) {
-    console.error('directory read failed:', companies.error ?? floors.error);
-    return json(502, { error: 'directory_unavailable' });
-  }
+export const handleDirectory = kioskHandler(async (_request, tokenHash) => {
+  const result = await kioskRpc<Directory>(
+    'kiosk_directory',
+    { p_token_hash: tokenHash },
+    'directory_unavailable',
+  );
+  if (!result.ok) return result.response;
 
   return json(200, {
-    companies: (companies.data ?? []).map((c) => ({
-      id: c.id,
-      name: c.name,
-      nameAr: c.name_ar,
-      floor: c.floor,
-    })),
-    floors: (floors.data ?? []).map((f) => ({
-      number: f.number,
-      name: f.name,
-      nameAr: f.name_ar,
-      imageUrl: f.image_url ?? '',
-    })),
+    companies: result.data.companies ?? [],
+    floors: result.data.floors ?? [],
     // A missing row means every field is shown, as the form did before.
-    formFields: formConfig.data?.fields ?? null,
+    formFields: result.data.formFields ?? null,
   });
 });
 

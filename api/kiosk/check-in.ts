@@ -1,6 +1,5 @@
 import { json, readJson } from '../_lib/http.js';
-import { kioskHandler, todayInRiyadh } from '../_lib/kiosk.js';
-import { serviceClient } from '../_lib/supabaseAdmin.js';
+import { kioskHandler, kioskRpc, todayInRiyadh } from '../_lib/kiosk.js';
 import { parseIdentityNumber, type IdentityType } from '../../src/domain/identity/identity.js';
 
 /**
@@ -10,6 +9,10 @@ import { parseIdentityNumber, type IdentityType } from '../../src/domain/identit
  * count today's rows, which restarted at 0001 each morning against a primary key
  * and silently lost every visit from the second day onward. This endpoint is the
  * only way a visit is created: no signed-in user has an insert policy.
+ *
+ * One database call, kiosk_check_in, checks the tablet, checks the company,
+ * allocates the code and saves the visit in one transaction. If saving fails,
+ * the code is not used up.
  */
 
 interface CheckInBody {
@@ -35,7 +38,7 @@ function asString(value: unknown, max: number): string | null {
   return trimmed.length === 0 || trimmed.length > max ? null : trimmed;
 }
 
-export const handleCheckIn = kioskHandler(async (request) => {
+export const handleCheckIn = kioskHandler(async (request, tokenHash) => {
   const body = await readJson<CheckInBody>(request);
   if (!body) return json(400, { error: 'invalid_request' });
 
@@ -53,56 +56,31 @@ export const handleCheckIn = kioskHandler(async (request) => {
   const signature = typeof body.signatureDataUrl === 'string' ? body.signatureDataUrl : '';
   if (signature.length > MAX_SIGNATURE_BYTES) return json(413, { error: 'signature_too_large' });
 
-  const supabase = serviceClient();
+  // The floor is taken from the company record inside the function, never from
+  // the tablet.
+  const result = await kioskRpc<{ visitCode: string; floor: number }>(
+    'kiosk_check_in',
+    {
+      p_token_hash: tokenHash,
+      p_today: todayInRiyadh(),
+      p_visit: {
+        visited_company_id: companyId,
+        visitor_type: visitorType,
+        name: asString(body.name, 120) ?? '',
+        phone: asString(body.phone, 32) ?? '',
+        email: asString(body.email, 160),
+        nationality_type: body.nationalityType,
+        nationality_id_number: identity.value,
+        country_code: asString(body.countryCode, 8) ?? 'SA',
+        country_name: asString(body.countryName, 80) ?? '',
+        signature_data_url: signature,
+      },
+    },
+    'check_in_failed',
+  );
+  if (!result.ok) return result.response;
 
-  // The floor comes from the company record, never from the tablet.
-  const { data: company, error: companyError } = await supabase
-    .from('companies')
-    .select('id, floor')
-    .eq('id', companyId)
-    .maybeSingle();
-
-  if (companyError) {
-    console.error('company check failed:', companyError);
-    return json(502, { error: 'check_in_unavailable' });
-  }
-  if (!company) return json(400, { error: 'unknown_company' });
-
-  const date = todayInRiyadh();
-
-  const { data: code, error: codeError } = await supabase.rpc('allocate_visit_code', {
-    p_date: date,
-  });
-  if (codeError || typeof code !== 'string') {
-    console.error('visit code allocation failed:', codeError);
-    return json(502, { error: 'check_in_unavailable' });
-  }
-
-  const { error: insertError } = await supabase.from('visitors').insert({
-    visit_code: code,
-    name: asString(body.name, 120) ?? '',
-    phone: asString(body.phone, 32) ?? '',
-    email: asString(body.email, 160),
-    nationality_type: body.nationalityType,
-    nationality_id_number: identity.value,
-    country_code: asString(body.countryCode, 8) ?? 'SA',
-    country_name: asString(body.countryName, 80) ?? '',
-    visitor_type: visitorType,
-    visited_company_id: company.id,
-    floor: company.floor,
-    signature_data_url: signature,
-    entry_time: new Date().toISOString(),
-    exit_time: null,
-    status: 'active',
-    date,
-  });
-
-  if (insertError) {
-    console.error('check-in insert failed:', insertError);
-    return json(502, { error: 'check_in_failed' });
-  }
-
-  return json(201, { visitCode: code, floor: company.floor });
+  return json(201, { visitCode: result.data.visitCode, floor: result.data.floor });
 });
 
 export function POST(request: Request): Promise<Response> {
