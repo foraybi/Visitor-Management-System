@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, ConfigProvider, Space, Tooltip } from 'antd';
+import { Alert, Button, ConfigProvider, Space, Tooltip } from 'antd';
 import { MutedOutlined, SoundOutlined } from '@ant-design/icons';
-import { SoundProvider, useSoundEnabled } from 'react-sounds';
+import { SoundProvider, playSound, useSoundEnabled } from 'react-sounds';
 import { useUIStore } from '../store/uiStore';
 import Sidebar from '../components/frontdesk/Sidebar';
 import StatCards from '../components/frontdesk/StatCards';
 import VisitorTable from '../components/frontdesk/VisitorTable';
 import CompaniesTab from '../components/frontdesk/CompaniesTab';
 import DashboardHeader from '../components/staff/DashboardHeader';
-import { useVisitorSounds } from '../app/staff/visitorSounds';
+import { ARRIVAL_SOUND, useAudioUnlocked, useVisitorSounds } from '../app/staff/visitorSounds';
 
 /** Saudi green. The front desk screen only; admin keeps the brand teal. */
 const FRONTDESK_GREEN = 'rgb(0, 108, 53)';
@@ -19,6 +19,7 @@ function FrontDeskScreen() {
   const [activeTab, setActiveTab] = useState<string>('visitors');
   const { dir } = useUIStore();
   const [soundsOn, setSoundsOn] = useSoundEnabled();
+  const audioUnlocked = useAudioUnlocked();
 
   useVisitorSounds(soundsOn);
 
@@ -45,6 +46,21 @@ function FrontDeskScreen() {
     </Tooltip>
   );
 
+  const soundPrompt =
+    soundsOn && !audioUnlocked ? (
+      <Alert
+        type="warning"
+        showIcon
+        icon={<SoundOutlined />}
+        message={t('common.soundsBlocked')}
+        action={
+          <Button type="primary" onClick={() => void playSound(ARRIVAL_SOUND).catch(() => {})}>
+            {t('common.soundsEnable')}
+          </Button>
+        }
+      />
+    ) : null;
+
   return (
     <div className="floating-orbs" style={{ minHeight: '100vh' }}>
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
@@ -60,12 +76,14 @@ function FrontDeskScreen() {
           {activeTab === 'visitors' ? (
             <>
               <DashboardHeader title={t('frontdesk.visitors')} extra={soundToggle} />
+              {soundPrompt}
               <StatCards />
               <VisitorTable />
             </>
           ) : (
             <>
               <DashboardHeader title={t('frontdesk.companies')} extra={soundToggle} />
+              {soundPrompt}
               <CompaniesTab />
             </>
           )}
@@ -83,7 +101,9 @@ export default function FrontDeskPage() {
         components: { Button: { colorPrimary: FRONTDESK_GREEN } },
       }}
     >
-      <SoundProvider initialEnabled={true}>
+      {/* No initialEnabled: the provider reads the saved on/off setting, so the
+          button and the sound library cannot disagree after a reload. */}
+      <SoundProvider>
         <FrontDeskScreen />
       </SoundProvider>
     </ConfigProvider>

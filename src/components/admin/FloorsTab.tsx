@@ -26,6 +26,7 @@ import type { ColumnsType } from 'antd/es/table';
 import type { UploadProps } from 'antd';
 import { useFloorStore } from '../../store/floorStore';
 import type { FloorInfo } from '../../types';
+import FloorContactsCard from './FloorContactsCard';
 
 const { Title } = Typography;
 
@@ -177,6 +178,10 @@ export default function FloorsTab() {
           pagination={false}
         />
       </Card>
+
+      <div style={{ marginTop: 16 }}>
+        <FloorContactsCard />
+      </div>
 
       <Modal
         open={modalOpen}

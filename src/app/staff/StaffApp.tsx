@@ -8,6 +8,7 @@ import { can, homeRouteFor, type Permission } from '../../domain/access/access';
 import { useAuthStore } from '../../store/authStore';
 import { useCompanyStore } from '../../store/companyStore';
 import { useDocumentSettingsStore } from '../../store/documentSettingsStore';
+import { useFloorContactStore } from '../../store/floorContactStore';
 import { useFloorStore } from '../../store/floorStore';
 import { useFormConfigStore } from '../../store/formConfigStore';
 import { useVisitorStore } from '../../store/visitorStore';
@@ -94,6 +95,7 @@ function useStaffData() {
   const fetchFloors = useFloorStore((s) => s.fetchFloors);
   const fetchFormConfig = useFormConfigStore((s) => s.fetchFormConfig);
   const fetchDocumentSettings = useDocumentSettingsStore((s) => s.fetchDocumentSettings);
+  const fetchContacts = useFloorContactStore((s) => s.fetchContacts);
 
   useEffect(() => {
     if (!role) return;
@@ -106,6 +108,7 @@ function useStaffData() {
         fetchFloors(),
         fetchFormConfig(),
         fetchDocumentSettings(),
+        fetchContacts(),
       ]);
       if (cancelled) {
         // Nothing to undo; the guard exists so a sign-out mid-flight does not
@@ -125,6 +128,7 @@ function useStaffData() {
     fetchFloors,
     fetchFormConfig,
     fetchDocumentSettings,
+    fetchContacts,
     subscribeToVisitors,
   ]);
 }

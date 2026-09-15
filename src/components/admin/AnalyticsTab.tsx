@@ -32,7 +32,7 @@ export default function AnalyticsTab() {
     const counts = { male: 0, female: 0 };
     companies.forEach(c => {
       c.employees.forEach(e => {
-        counts[e.gender] += 1;
+        if (e.gender) counts[e.gender] += 1;
       });
     });
     return [

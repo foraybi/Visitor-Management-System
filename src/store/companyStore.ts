@@ -4,9 +4,42 @@ import { generateId } from '../utils/idGenerator';
 import { supabase, toCompany, fromCompany, fromEmployee } from '../lib/supabase';
 import { persist } from '../data/persist';
 
+/** One company as sent to admin_import_companies. */
+export interface ImportCompanyPayload {
+  importRef: string | null;
+  name: string;
+  nameAr: string;
+  phone: string;
+  floor: number;
+  crNumber: string | null;
+  foundersLimit: number;
+  employeesLimit: number;
+  incubationStart: string | null;
+  incubationEnd: string | null;
+  founder: {
+    name: string;
+    nameAr: string;
+    phone: string;
+    email: string;
+    nationalityType: string;
+    nationalityIdNumber: string;
+    countryCode: string;
+    gender: 'male' | 'female' | null;
+  } | null;
+}
+
+export type ImportResult =
+  | { ok: true; created: number; skipped: number; founders: number }
+  | { ok: false; error: string };
+
 interface ExtendedCompanyState extends CompanyState {
   loaded: boolean;
   fetchCompanies: () => Promise<void>;
+  /**
+   * Create the selected companies and their founders in one transaction, then
+   * reload. Rows already imported are skipped by the database.
+   */
+  importCompanies: (companies: ImportCompanyPayload[]) => Promise<ImportResult>;
 }
 
 export const useCompanyStore = create<ExtendedCompanyState>()((set, get) => ({
@@ -23,6 +56,19 @@ export const useCompanyStore = create<ExtendedCompanyState>()((set, get) => ({
       return;
     }
     set({ companies: (data ?? []).map(toCompany), loaded: true });
+  },
+
+  importCompanies: async (companies) => {
+    const { data, error } = await supabase.rpc('admin_import_companies', { p_companies: companies });
+    if (error) return { ok: false, error: error.message };
+    await get().fetchCompanies();
+    const result = (data ?? {}) as { created?: number; skipped?: number; founders?: number };
+    return {
+      ok: true,
+      created: result.created ?? 0,
+      skipped: result.skipped ?? 0,
+      founders: result.founders ?? 0,
+    };
   },
 
   addCompany: (data: Omit<Company, 'id'>) => {
@@ -45,6 +91,11 @@ export const useCompanyStore = create<ExtendedCompanyState>()((set, get) => ({
                 logoUrl: data.logoUrl,
                 phone: data.phone,
                 floor: data.floor,
+                crNumber: data.crNumber,
+                foundersLimit: data.foundersLimit,
+                employeesLimit: data.employeesLimit,
+                incubationStart: data.incubationStart,
+                incubationEnd: data.incubationEnd,
               }),
             ),
         () => set({ companies: previous }),
@@ -79,6 +130,11 @@ export const useCompanyStore = create<ExtendedCompanyState>()((set, get) => ({
     if (data.logoUrl !== undefined) row.logo_url = data.logoUrl || null;
     if (data.phone !== undefined) row.phone = data.phone;
     if (data.floor !== undefined) row.floor = data.floor;
+    if (data.crNumber !== undefined) row.cr_number = data.crNumber || null;
+    if (data.foundersLimit !== undefined) row.founders_limit = data.foundersLimit;
+    if (data.employeesLimit !== undefined) row.employees_limit = data.employeesLimit;
+    if (data.incubationStart !== undefined) row.incubation_start = data.incubationStart || null;
+    if (data.incubationEnd !== undefined) row.incubation_end = data.incubationEnd || null;
     if (Object.keys(row).length > 0) {
       void persist(
         'company.update',
@@ -134,7 +190,8 @@ export const useCompanyStore = create<ExtendedCompanyState>()((set, get) => ({
     if (data.nationalityType !== undefined) row.nationality_type = data.nationalityType;
     if (data.nationalityIdNumber !== undefined) row.nationality_id_number = data.nationalityIdNumber;
     if (data.countryCode !== undefined) row.country_code = data.countryCode;
-    if (data.gender !== undefined) row.gender = data.gender;
+    if (data.gender !== undefined) row.gender = data.gender ?? null;
+    if (data.employeeType !== undefined) row.employee_type = data.employeeType;
     if (data.employmentStatus !== undefined) row.employment_status = data.employmentStatus;
     if (data.jobType !== undefined) row.job_type = data.jobType;
     if (data.department !== undefined) row.department = data.department ?? null;

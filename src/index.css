@@ -967,6 +967,79 @@ html[dir='rtl'] .ant-table-tbody > tr.visitor-row-active > td:first-child {
   color: var(--brand);
 }
 
+/* ── Company founders and employees ───────────────────────────────────────── */
+
+.company-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.company-avatar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.people-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(var(--brand-rgb), 0.12);
+}
+
+.people-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.slot-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.slot-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 4px 14px;
+  border: 1.5px dashed rgba(var(--brand-rgb), 0.45);
+  border-radius: 10px;
+  background: rgba(var(--brand-rgb), 0.04);
+  color: var(--brand);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.slot-empty:hover {
+  background: rgba(var(--brand-rgb), 0.1);
+}
+
+.slot-more {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.ant-table-tbody > tr.import-row-blocked > td {
+  background: rgba(250, 173, 20, 0.07) !important;
+}
+
 /* ── Kiosk welcome screen ─────────────────────────────────────────────────── */
 
 .kiosk-screen {

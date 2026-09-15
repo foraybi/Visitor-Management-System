@@ -36,3 +36,4 @@ dist-server
 supabase/.temp
 supabase/.branches
 .env.bak
+.playwright-cli/

@@ -35,6 +35,17 @@ export interface Visitor {
 }
 
 export type EmploymentStatus = 'active' | 'inactive';
+/** A founder fills one of the company's founder places; an employee, a staff place. */
+export type EmployeeType = 'founder' | 'employee';
+
+/** An administration contact shown to the front desk when a company is full. */
+export interface FloorContact {
+  id: string;
+  floor: Floor;
+  name: string;
+  phone: string;
+  sortOrder: number;
+}
 export type JobType = 'full_time' | 'part_time' | 'internship' | 'contract';
 export type VerificationStatus = 'verified' | 'pending';
 
@@ -48,7 +59,8 @@ export interface Employee {
   nationalityType: NationalityType;
   nationalityIdNumber: string;
   countryCode: string;
-  gender: 'male' | 'female';
+  /** Absent when an imported registration did not record it. */
+  gender?: 'male' | 'female';
   employmentStatus: EmploymentStatus;
   jobType: JobType;
   department?: string;
@@ -58,6 +70,7 @@ export interface Employee {
   notes?: string;
   /** Admin-controlled verification flag. New employees added by frontdesk default to 'pending'. */
   verificationStatus: VerificationStatus;
+  employeeType: EmployeeType;
 }
 
 export interface Company {
@@ -69,6 +82,16 @@ export interface Company {
   floor: Floor;
   employeeCount: number;
   employees: Employee[];
+  /** Commercial registration number, from the incubation import. */
+  crNumber?: string;
+  /** Founder places. Null means no limit, as for companies added before imports. */
+  foundersLimit?: number | null;
+  /** Employee places. Null means no limit. */
+  employeesLimit?: number | null;
+  /** ISO dates, set and edited by an admin. */
+  incubationStart?: string;
+  incubationEnd?: string;
+  importRef?: string;
 }
 
 export interface FrontDeskUser {

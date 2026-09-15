@@ -16,6 +16,7 @@ import {
   Row,
   Col,
   DatePicker,
+  InputNumber,
   Upload,
   Image as AntImage,
   Alert,
@@ -30,7 +31,10 @@ import {
   UploadOutlined,
   UserOutlined,
   TeamOutlined,
+  FileExcelOutlined,
 } from '@ant-design/icons';
+import ImportCompaniesModal from './ImportCompaniesModal';
+import { capacityFor } from '../../domain/incubation/capacity';
 import type { ColumnsType } from 'antd/es/table';
 import type { UploadProps } from 'antd';
 import dayjs from 'dayjs';
@@ -75,6 +79,7 @@ export default function ManagementTab() {
   const visitors = useVisitorStore(state => state.visitors);
 
   const [companyModalOpen, setCompanyModalOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [employeeModalOpen, setEmployeeModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<{ employee: Employee; companyId: string } | null>(null);
@@ -94,14 +99,30 @@ export default function ManagementTab() {
   };
   const openEditCompany = (company: Company) => {
     setEditingCompany(company);
-    companyForm.setFieldsValue(company);
+    companyForm.setFieldsValue({
+      ...company,
+      incubationPeriod: [
+        company.incubationStart ? dayjs(company.incubationStart) : null,
+        company.incubationEnd ? dayjs(company.incubationEnd) : null,
+      ],
+    });
     setCompanyModalOpen(true);
   };
   const handleCompanySubmit = (values: CompanyFormValues) => {
+    const { incubationPeriod, ...rest } = values;
+    // Empty strings and nulls clear the stored value; a blank limit means no limit.
+    const fields = {
+      ...rest,
+      crNumber: values.crNumber?.trim() ?? '',
+      foundersLimit: values.foundersLimit ?? null,
+      employeesLimit: values.employeesLimit ?? null,
+      incubationStart: incubationPeriod?.[0]?.format('YYYY-MM-DD') ?? '',
+      incubationEnd: incubationPeriod?.[1]?.format('YYYY-MM-DD') ?? '',
+    };
     if (editingCompany) {
-      updateCompany(editingCompany.id, values);
+      updateCompany(editingCompany.id, fields);
     } else {
-      addCompany({ ...values, employees: [], employeeCount: 0, logoUrl: '' });
+      addCompany({ ...fields, employees: [], employeeCount: 0, logoUrl: '' });
     }
     setCompanyModalOpen(false);
     companyForm.resetFields();
@@ -121,6 +142,7 @@ export default function ManagementTab() {
       employmentStatus: 'active',
       jobType: 'full_time',
       countryCode: 'SA',
+      employeeType: 'employee',
     });
     setEmployeeModalOpen(true);
   };
@@ -173,6 +195,7 @@ export default function ManagementTab() {
       hireDate: values.hireDate ? dayjs(values.hireDate).format('YYYY-MM-DD') : undefined,
       photoDataUrl: resolvedPhotoUrl,
       notes: values.notes,
+      employeeType: values.employeeType ?? editingEmployee?.employee.employeeType ?? 'employee',
     };
     if (editingEmployee) {
       updateEmployee(editingEmployee.companyId, editingEmployee.employee.id, data);
@@ -205,9 +228,36 @@ export default function ManagementTab() {
     },
     { title: t('table.phone'), dataIndex: 'phone', key: 'phone' },
     {
-      title: t('company.employeeCount'),
-      key: 'count',
-      render: (_, record) => <Tag>{record.employees.length}</Tag>,
+      title: t('incubation.crNumber'),
+      dataIndex: 'crNumber',
+      key: 'crNumber',
+      render: (cr?: string) => <span dir="ltr">{cr || '—'}</span>,
+    },
+    {
+      title: t('incubation.founders'),
+      key: 'founders',
+      render: (_, record) => {
+        const c = capacityFor(record, 'founder');
+        return <Tag color={c.full ? 'error' : undefined}>{c.limit === null ? c.used : `${c.used} / ${c.limit}`}</Tag>;
+      },
+    },
+    {
+      title: t('incubation.employees'),
+      key: 'employees',
+      render: (_, record) => {
+        const c = capacityFor(record, 'employee');
+        return <Tag color={c.full ? 'error' : undefined}>{c.limit === null ? c.used : `${c.used} / ${c.limit}`}</Tag>;
+      },
+    },
+    {
+      title: t('incubation.period'),
+      key: 'period',
+      render: (_, record) =>
+        record.incubationStart || record.incubationEnd ? (
+          <span dir="ltr">{record.incubationStart ?? '…'} → {record.incubationEnd ?? '…'}</span>
+        ) : (
+          '—'
+        ),
     },
     {
       title: t('table.actions'),
@@ -297,12 +347,26 @@ export default function ManagementTab() {
       dataIndex: 'gender',
       key: 'gender',
       width: 90,
-      render: gender => (
-        <Tag
-          icon={gender === 'male' ? <ManOutlined /> : <WomanOutlined />}
-          color={gender === 'male' ? 'blue' : 'pink'}
-        >
-          {gender === 'male' ? t('company.male') : t('company.female')}
+      render: (gender: Employee['gender']) =>
+        gender ? (
+          <Tag
+            icon={gender === 'male' ? <ManOutlined /> : <WomanOutlined />}
+            color={gender === 'male' ? 'blue' : 'pink'}
+          >
+            {gender === 'male' ? t('company.male') : t('company.female')}
+          </Tag>
+        ) : (
+          '—'
+        ),
+    },
+    {
+      title: t('incubation.employeeType'),
+      dataIndex: 'employeeType',
+      key: 'employeeType',
+      width: 100,
+      render: (type: Employee['employeeType']) => (
+        <Tag color={type === 'founder' ? 'gold' : undefined}>
+          {type === 'founder' ? t('incubation.founder') : t('incubation.employee')}
         </Tag>
       ),
     },
@@ -631,12 +695,18 @@ export default function ManagementTab() {
               <Card
                 title={<Title level={4} style={{ margin: 0 }}>{t('frontdesk.companies')}</Title>}
                 extra={
-                  <Button type="primary" icon={<PlusOutlined />} onClick={openAddCompany}>
-                    {t('company.addCompany')}
-                  </Button>
+                  <Space wrap>
+                    <Button icon={<FileExcelOutlined />} onClick={() => setImportOpen(true)}>
+                      {t('incubation.importButton')}
+                    </Button>
+                    <Button type="primary" icon={<PlusOutlined />} onClick={openAddCompany}>
+                      {t('company.addCompany')}
+                    </Button>
+                  </Space>
                 }
               >
-                <Table columns={companyColumns} dataSource={companies} rowKey="id" pagination={{ pageSize: 10 }} scroll={{ x: 900 }} />
+                <Table columns={companyColumns} dataSource={companies} rowKey="id" pagination={{ pageSize: 10 }} scroll={{ x: 1300 }} />
+                <ImportCompaniesModal open={importOpen} onClose={() => setImportOpen(false)} />
               </Card>
             ),
           },
@@ -713,6 +783,24 @@ export default function ManagementTab() {
                 label: `${f.name} (${t('visitor.floor')} ${f.number})`,
               }))}
             />
+          </Form.Item>
+          <Form.Item label={t('incubation.crNumber')} name="crNumber" rules={[{ pattern: /^\d{5,20}$/ }]}>
+            <Input size="large" inputMode="numeric" maxLength={20} dir="ltr" />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item label={t('incubation.foundersLimit')} name="foundersLimit" extra={t('incubation.noLimit')}>
+                <InputNumber size="large" min={0} max={1000} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label={t('incubation.employeesLimit')} name="employeesLimit" extra={t('incubation.noLimit')}>
+                <InputNumber size="large" min={0} max={100000} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item label={t('incubation.period')} name="incubationPeriod">
+            <DatePicker.RangePicker size="large" style={{ width: '100%' }} format="YYYY-MM-DD" allowEmpty={[true, true]} />
           </Form.Item>
           <Form.Item style={{ marginBottom: 0 }}>
             <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
@@ -845,6 +933,17 @@ export default function ManagementTab() {
                   options={[
                     { value: 'male', label: t('company.male') },
                     { value: 'female', label: t('company.female') },
+                  ]}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item label={t('incubation.employeeType')} name="employeeType" rules={[{ required: true }]}>
+                <Select
+                  size="large"
+                  options={[
+                    { value: 'founder', label: t('incubation.founder') },
+                    { value: 'employee', label: t('incubation.employee') },
                   ]}
                 />
               </Form.Item>

@@ -3,6 +3,7 @@ import type {
   Company,
   EmploymentStatus,
   Employee,
+  EmployeeType,
   JobType,
   NationalityType,
 } from './index';
@@ -22,6 +23,11 @@ import type {
 
 export interface CompanyFormValues extends Pick<Company, 'name' | 'nameAr' | 'phone' | 'floor'> {
   logoUrl?: string;
+  crNumber?: string;
+  foundersLimit?: number | null;
+  employeesLimit?: number | null;
+  /** A range picker yields two Dayjs values; the record stores ISO dates. */
+  incubationPeriod?: [Dayjs | null, Dayjs | null] | null;
 }
 
 export interface EmployeeFormValues {
@@ -33,9 +39,10 @@ export interface EmployeeFormValues {
   nationalityType: NationalityType;
   nationalityIdNumber: string;
   countryCode: string;
-  gender: Employee['gender'];
+  gender?: Employee['gender'];
   employmentStatus?: EmploymentStatus;
   jobType: JobType;
+  employeeType?: EmployeeType;
   department?: string;
   position?: string;
   /** A date picker yields a Dayjs; the record stores an ISO date string. */

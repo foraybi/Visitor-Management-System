@@ -14,26 +14,39 @@ import {
 } from 'antd';
 import dayjs from 'dayjs';
 import type { EmployeeFormValues } from '../../types/forms';
+import { can } from '../../domain/access/access';
+import { capacityFor } from '../../domain/incubation/capacity';
+import { identityLabelKey } from '../../domain/identity/identity';
+import { useAuthStore } from '../../store/authStore';
 import { useCompanyStore } from '../../store/companyStore';
 import { useUIStore } from '../../store/uiStore';
 import { countries } from '../../utils/countryData';
 import { generateEmployeeNumber } from '../../utils/idGenerator';
-import type { Employee, NationalityType } from '../../types';
+import type { Employee, EmployeeType, NationalityType } from '../../types';
 
 interface Props {
   companyId: string;
   open: boolean;
   onClose: () => void;
+  /** Which list the person is added to. */
+  employeeType: EmployeeType;
+  /** Called instead of saving when the chosen list is already full. */
+  onFull: (type: EmployeeType) => void;
 }
 
 /**
  * Front-desk employee creation modal. Always inserts the employee with
  * verificationStatus='pending' so the admin can later approve.
+ *
+ * The chosen list is checked again on save, because another front desk screen
+ * may have filled the last place while this form was open. The database
+ * enforces the same limit for the front desk.
  */
-export default function CompanyEmployeeForm({ companyId, open, onClose }: Props) {
+export default function CompanyEmployeeForm({ companyId, open, onClose, employeeType, onFull }: Props) {
   const { t } = useTranslation();
   const { language } = useUIStore();
   const { companies, addEmployee } = useCompanyStore();
+  const role = useAuthStore((s) => s.currentRole);
   const [form] = Form.useForm();
   const [nationalityType, setNationalityType] = useState<NationalityType | null>(null);
 
@@ -52,6 +65,14 @@ export default function CompanyEmployeeForm({ companyId, open, onClose }: Props)
   };
 
   const onFinish = (values: EmployeeFormValues) => {
+    const type: EmployeeType = values.employeeType ?? employeeType;
+    const company = companies.find(c => c.id === companyId);
+    // An admin may go over a limit; the front desk may not.
+    if (company && capacityFor(company, type).full && !can(role, 'companies.write')) {
+      onFull(type);
+      return;
+    }
+
     const data: Omit<Employee, 'id'> = {
       employeeNumber: values.employeeNumber,
       name: values.name,
@@ -68,6 +89,7 @@ export default function CompanyEmployeeForm({ companyId, open, onClose }: Props)
       position: values.position,
       hireDate: values.hireDate ? dayjs(values.hireDate).format('YYYY-MM-DD') : undefined,
       verificationStatus: 'pending', // ← front-desk additions await admin verification
+      employeeType: type,
     };
     addEmployee(companyId, data);
     message.success(t('employee.pending'));
@@ -79,46 +101,42 @@ export default function CompanyEmployeeForm({ companyId, open, onClose }: Props)
   return (
     <Modal
       open={open}
-      title={t('admin.addEmployee')}
+      title={employeeType === 'founder' ? t('incubation.addFounder') : t('incubation.addEmployee')}
       onCancel={onClose}
       footer={null}
       centered
-      destroyOnClose
-      width={760}
+      destroyOnHidden
+      width="min(760px, 96vw)"
     >
       <Form
         form={form}
         layout="vertical"
-        initialValues={{ employeeNumber: nextNumber, countryCode: 'SA', employmentStatus: 'active', jobType: 'full_time' }}
+        initialValues={{
+          employeeNumber: nextNumber,
+          countryCode: 'SA',
+          employmentStatus: 'active',
+          jobType: 'full_time',
+          employeeType,
+        }}
         onFinish={onFinish}
         requiredMark
         style={{ marginTop: 16 }}
       >
         <Row gutter={16}>
           <Col xs={24} md={8}>
+            <Form.Item label={t('incubation.employeeType')} name="employeeType" rules={[{ required: true }]}>
+              <Select
+                size="large"
+                options={[
+                  { value: 'founder', label: t('incubation.founder') },
+                  { value: 'employee', label: t('incubation.employee') },
+                ]}
+              />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={8}>
             <Form.Item label={t('visitor.employeeNumber')} name="employeeNumber" rules={[{ required: true }, { pattern: /^\d{4}$/ }]}>
               <Input size="large" maxLength={4} />
-            </Form.Item>
-          </Col>
-          <Col xs={24} md={8}>
-            <Form.Item label={t('employee.nameEn')} name="name" rules={[{ required: true }]}>
-              <Input size="large" />
-            </Form.Item>
-          </Col>
-          <Col xs={24} md={8}>
-            <Form.Item label={t('employee.nameAr')} name="nameAr" rules={[{ required: true }]}>
-              <Input size="large" />
-            </Form.Item>
-          </Col>
-
-          <Col xs={24} md={8}>
-            <Form.Item label={t('table.phone')} name="phone" rules={[{ required: true }, { pattern: /^05\d{8}$/ }]}>
-              <Input size="large" inputMode="numeric" maxLength={10} placeholder="0501234567" />
-            </Form.Item>
-          </Col>
-          <Col xs={24} md={8}>
-            <Form.Item label={t('employee.email')} name="email" rules={[{ type: 'email' }]}>
-              <Input size="large" type="email" />
             </Form.Item>
           </Col>
           <Col xs={24} md={8}>
@@ -133,6 +151,28 @@ export default function CompanyEmployeeForm({ companyId, open, onClose }: Props)
             </Form.Item>
           </Col>
 
+          <Col xs={24} md={12}>
+            <Form.Item label={t('employee.nameAr')} name="nameAr" rules={[{ required: true }]}>
+              <Input size="large" />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item label={t('employee.nameEn')} name="name" rules={[{ required: true }]}>
+              <Input size="large" />
+            </Form.Item>
+          </Col>
+
+          <Col xs={24} md={12}>
+            <Form.Item label={t('table.phone')} name="phone" rules={[{ required: true }, { pattern: /^05\d{8}$/, message: t('visitor.validation.phoneFormat') }]}>
+              <Input size="large" inputMode="numeric" maxLength={10} placeholder="0501234567" dir="ltr" />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item label={t('employee.email')} name="email" rules={[{ type: 'email', message: t('visitor.validation.emailFormat') }]}>
+              <Input size="large" type="email" dir="ltr" />
+            </Form.Item>
+          </Col>
+
           <Col xs={24} md={8}>
             <Form.Item label={t('visitor.nationalityType')} name="nationalityType" rules={[{ required: true }]}>
               <Select
@@ -142,11 +182,10 @@ export default function CompanyEmployeeForm({ companyId, open, onClose }: Props)
                   form.setFieldValue('nationalityIdNumber', '');
                   if (v === 'national_id') form.setFieldValue('countryCode', 'SA');
                 }}
-                options={[
-                  { value: 'national_id', label: language === 'ar' ? 'الهوية الوطنية' : 'National ID' },
-                  { value: 'iqama', label: language === 'ar' ? 'الإقامة' : 'Iqama' },
-                  { value: 'passport', label: language === 'ar' ? 'جواز السفر' : 'Passport' },
-                ]}
+                options={(['national_id', 'iqama', 'passport'] as const).map(v => ({
+                  value: v,
+                  label: t(identityLabelKey(v)),
+                }))}
               />
             </Form.Item>
           </Col>
@@ -157,6 +196,7 @@ export default function CompanyEmployeeForm({ companyId, open, onClose }: Props)
                 disabled={!nationalityType}
                 maxLength={nationalityType === 'passport' ? 20 : 10}
                 inputMode={nationalityType === 'passport' ? 'text' : 'numeric'}
+                dir="ltr"
               />
             </Form.Item>
           </Col>

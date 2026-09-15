@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Visitor, Company, Employee, FloorInfo } from '../types';
+import type { Visitor, Company, Employee, FloorContact, FloorInfo } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
@@ -41,7 +41,7 @@ type EmployeeRow = {
   nationality_type: string;
   nationality_id_number: string;
   country_code: string;
-  gender: string;
+  gender: string | null;
   employment_status: string;
   job_type: string;
   department: string | null;
@@ -50,6 +50,7 @@ type EmployeeRow = {
   photo_data_url: string | null;
   notes: string | null;
   verification_status: string;
+  employee_type?: string | null;
 };
 
 type CompanyRow = {
@@ -61,6 +62,20 @@ type CompanyRow = {
   floor: number;
   employee_count: number;
   employees?: EmployeeRow[];
+  cr_number?: string | null;
+  founders_limit?: number | null;
+  employees_limit?: number | null;
+  incubation_start?: string | null;
+  incubation_end?: string | null;
+  import_ref?: string | null;
+};
+
+type FloorContactRow = {
+  id: string;
+  floor: number;
+  name: string;
+  phone: string;
+  sort_order: number;
 };
 
 type FloorRow = {
@@ -106,7 +121,7 @@ export function toEmployee(row: EmployeeRow): Employee {
     nationalityType: row.nationality_type as Employee['nationalityType'],
     nationalityIdNumber: row.nationality_id_number,
     countryCode: row.country_code,
-    gender: row.gender as Employee['gender'],
+    gender: (row.gender ?? undefined) as Employee['gender'],
     employmentStatus: row.employment_status as Employee['employmentStatus'],
     jobType: row.job_type as Employee['jobType'],
     department: row.department ?? undefined,
@@ -115,6 +130,7 @@ export function toEmployee(row: EmployeeRow): Employee {
     photoDataUrl: row.photo_data_url ?? undefined,
     notes: row.notes ?? undefined,
     verificationStatus: row.verification_status as Employee['verificationStatus'],
+    employeeType: row.employee_type === 'founder' ? 'founder' : 'employee',
   };
 }
 
@@ -129,6 +145,22 @@ export function toCompany(row: CompanyRow): Company {
     floor: row.floor,
     employeeCount: employees.length,
     employees,
+    crNumber: row.cr_number ?? undefined,
+    foundersLimit: row.founders_limit ?? null,
+    employeesLimit: row.employees_limit ?? null,
+    incubationStart: row.incubation_start ?? undefined,
+    incubationEnd: row.incubation_end ?? undefined,
+    importRef: row.import_ref ?? undefined,
+  };
+}
+
+export function toFloorContact(row: FloorContactRow): FloorContact {
+  return {
+    id: row.id,
+    floor: row.floor,
+    name: row.name,
+    phone: row.phone,
+    sortOrder: row.sort_order,
   };
 }
 
@@ -177,7 +209,7 @@ export function fromEmployee(e: Employee, companyId: string) {
     nationality_type: e.nationalityType,
     nationality_id_number: e.nationalityIdNumber,
     country_code: e.countryCode,
-    gender: e.gender,
+    gender: e.gender ?? null,
     employment_status: e.employmentStatus,
     job_type: e.jobType,
     department: e.department ?? null,
@@ -186,6 +218,7 @@ export function fromEmployee(e: Employee, companyId: string) {
     photo_data_url: e.photoDataUrl ?? null,
     notes: e.notes ?? null,
     verification_status: e.verificationStatus,
+    employee_type: e.employeeType,
   };
 }
 
@@ -198,6 +231,11 @@ export function fromCompany(c: { id: string } & Omit<Company, 'id' | 'employees'
     phone: c.phone,
     floor: c.floor,
     employee_count: 0,
+    cr_number: c.crNumber || null,
+    founders_limit: c.foundersLimit ?? null,
+    employees_limit: c.employeesLimit ?? null,
+    incubation_start: c.incubationStart || null,
+    incubation_end: c.incubationEnd || null,
   };
 }
 
