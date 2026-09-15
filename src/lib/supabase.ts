@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Visitor, Company, Employee, FloorContact, FloorInfo } from '../types';
+import { isVisitPurpose } from '../domain/visit/visitPurpose';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
@@ -13,6 +14,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 type VisitorRow = {
   id: string;
   visit_code: string;
+  visit_purpose?: string | null;
   name: string;
   phone: string;
   email: string | null;
@@ -92,6 +94,7 @@ export function toVisitor(row: VisitorRow): Visitor {
   return {
     id: row.id,
     visitCode: row.visit_code ?? '',
+    visitPurpose: isVisitPurpose(row.visit_purpose) ? row.visit_purpose : null,
     name: row.name,
     phone: row.phone,
     email: row.email ?? undefined,

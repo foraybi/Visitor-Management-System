@@ -35,6 +35,7 @@ import {
   inferIdentityType,
   parseIdentityNumber,
 } from '../../domain/identity/identity';
+import { VISIT_PURPOSES, visitPurposeLabelKey, type VisitPurpose } from '../../domain/visit/visitPurpose';
 import { countries } from '../../utils/countryData';
 import VisitorIdCard from './VisitorIdCard';
 import EmployeeWelcomeCard from './EmployeeWelcomeCard';
@@ -58,6 +59,7 @@ interface CheckInFormValues {
   phone?: string;
   email?: string;
   countryCode?: string;
+  visitPurpose?: VisitPurpose;
   employeeNumber?: string;
   agreedToTerms?: boolean;
 }
@@ -249,8 +251,8 @@ export default function EnterForm({ onClose }: EnterFormProps) {
       // "required only on this branch". Check rather than defaulting, so a
       // validation gap surfaces as a message instead of an empty name in the
       // visitor log.
-      const { name, phone, countryCode } = values;
-      if (!name || !phone || !countryCode) {
+      const { name, phone, countryCode, visitPurpose } = values;
+      if (!name || !phone || !countryCode || !visitPurpose) {
         message.error(t('common.required'));
         return;
       }
@@ -269,6 +271,7 @@ export default function EnterForm({ onClose }: EnterFormProps) {
         visitedCompanyId: values.visitedCompanyId,
         floor: selectedFloor,
         signatureDataUrl,
+        visitPurpose,
       });
 
       if (!result.ok) {
@@ -293,7 +296,7 @@ export default function EnterForm({ onClose }: EnterFormProps) {
   }
 
   if (generatedId) {
-    return <VisitorIdCard visitorId={generatedId} onClose={onClose} />;
+    return <VisitorIdCard onClose={onClose} />;
   }
 
   return (
@@ -639,6 +642,24 @@ export default function EnterForm({ onClose }: EnterFormProps) {
                       placeholder={t('visitor.countryPlaceholder')}
                       options={countryOptions}
                       filterOption={filterBySearchText}
+                    />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24}>
+                  <Form.Item
+                    label={t('visitor.purposeLabel')}
+                    name="visitPurpose"
+                    rules={[{ required: true, message: t('common.required') }]}
+                  >
+                    <Select
+                      size="large"
+                      classNames={{ popup: { root: 'enter-form-dropdown' } }}
+                      placeholder={t('visitor.purposePlaceholder')}
+                      options={VISIT_PURPOSES.map(purpose => ({
+                        value: purpose,
+                        label: t(visitPurposeLabelKey(purpose)),
+                      }))}
                     />
                   </Form.Item>
                 </Col>

@@ -90,52 +90,69 @@ describe('the kiosk gateway contract', () => {
     });
   });
 
-  describe('check-out', () => {
-    it('closes an open visit and returns the name for the farewell screen', async () => {
+  // Everyone checks out with the mobile or ID number they checked in with. The
+  // visit code is for the front desk and admin, and is not typed at the tablet.
+  describe('check-out by mobile number', () => {
+    it('closes a visitor\'s open visit and returns the name for the farewell screen', async () => {
       const gateway = inMemoryKioskGateway();
       await gateway.checkIn(checkIn({ name: 'Sara' }));
 
-      expect(await gateway.checkOut({ visitCode: '0001' })).toEqual({
+      expect(await gateway.checkOut({ phone: '0512345678' })).toEqual({
         ok: true,
         value: { name: 'Sara' },
       });
     });
 
-    it('accepts a code typed without leading zeros', async () => {
+    it('accepts the international form of the number', async () => {
       const gateway = inMemoryKioskGateway();
       await gateway.checkIn(checkIn());
 
-      expect((await gateway.checkOut({ visitCode: '1' })).ok).toBe(true);
+      expect((await gateway.checkOut({ phone: '+966512345678' })).ok).toBe(true);
     });
 
     it('refuses to close the same visit twice', async () => {
       const gateway = inMemoryKioskGateway();
       await gateway.checkIn(checkIn());
-      await gateway.checkOut({ visitCode: '0001' });
+      await gateway.checkOut({ phone: '0512345678' });
 
-      expect(await gateway.checkOut({ visitCode: '0001' })).toEqual({
+      expect(await gateway.checkOut({ phone: '0512345678' })).toEqual({
         ok: false,
         error: 'no_active_visit',
       });
     });
 
-    // Codes repeat across days, so a code must only ever close a visit opened
-    // today. Otherwise yesterday's 0001 closes today's.
-    it('will not close yesterday\'s visit with today\'s code', async () => {
-      const gateway = inMemoryKioskGateway();
-      await gateway.checkIn(checkIn());
-      gateway.nextDay();
+    // An employee's visit row carries no phone, so the employee record's is used.
+    it('closes an employee\'s visit by the phone on their employee record', async () => {
+      const gateway = inMemoryKioskGateway({
+        employees: [
+          {
+            idNumber: '1029384756',
+            phone: '0598765432',
+            match: { name: 'Noura', nameAr: 'نورة', employeeNumber: '0007', company: null },
+          },
+        ],
+      });
+      await gateway.checkIn(
+        checkIn({ visitorType: 'employee', name: 'Noura', phone: '', nationalityIdNumber: '1029384756' }),
+      );
 
-      expect(await gateway.checkOut({ visitCode: '0001' })).toEqual({
+      expect(await gateway.checkOut({ phone: '0598765432' })).toEqual({
+        ok: true,
+        value: { name: 'Noura' },
+      });
+    });
+
+    it('rejects something that is not a mobile number', async () => {
+      const gateway = inMemoryKioskGateway();
+
+      expect(await gateway.checkOut({ phone: '12345' })).toEqual({
         ok: false,
-        error: 'no_active_visit',
+        error: 'invalid_identity',
       });
     });
   });
 
-  // Employees are never shown a visit code, so without this they had no way to
-  // check out at the tablet and their attendance never got an exit time.
-  describe('employee check-out by identity number', () => {
+  describe('check-out by identity number', () => {
     const employeeVisit = () =>
       checkIn({ visitorType: 'employee', name: 'Noura', nationalityIdNumber: '1029384756' });
 
@@ -158,15 +175,13 @@ describe('the kiosk gateway contract', () => {
       ).toBe(true);
     });
 
-    // A visitor's identity number must not close their visit: only the code on
-    // their card does, so someone who overhears an ID cannot check them out.
-    it('will not close a visitor\'s visit by identity number', async () => {
+    it('closes a visitor\'s visit by identity number', async () => {
       const gateway = inMemoryKioskGateway();
       await gateway.checkIn(checkIn({ nationalityIdNumber: '1029384756' }));
 
       expect(
         await gateway.checkOut({ idType: 'national_id', idNumber: '1029384756' }),
-      ).toEqual({ ok: false, error: 'no_active_visit' });
+      ).toEqual({ ok: true, value: { name: 'Sara' } });
     });
 
     it('will not close yesterday\'s visit', async () => {

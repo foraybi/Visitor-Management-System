@@ -19,6 +19,7 @@ import type { ColumnsType } from 'antd/es/table';
 import dayjs, { type Dayjs } from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import { identityLabelKey } from '../../domain/identity/identity';
+import { visitPurposeLabelKey } from '../../domain/visit/visitPurpose';
 import { useVisitorStore } from '../../store/visitorStore';
 import { useCompanyStore } from '../../store/companyStore';
 import { useFloorStore } from '../../store/floorStore';
@@ -294,6 +295,11 @@ export default function VisitorTable() {
             <div className="cell-sub">
               <Tag color="cyan" style={{ margin: 0 }}>{floorName(v.floor)}</Tag>
             </div>
+            {v.visitPurpose && (
+              <div className="cell-sub" title={t(visitPurposeLabelKey(v.visitPurpose))}>
+                {t(visitPurposeLabelKey(v.visitPurpose))}
+              </div>
+            )}
           </div>
         );
       },

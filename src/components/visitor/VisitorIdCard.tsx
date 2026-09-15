@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Typography, Button, Card } from 'antd';
-import { CameraOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
 
 interface VisitorIdCardProps {
-  visitorId: string;
   onClose: () => void;
 }
 
-export default function VisitorIdCard({ visitorId, onClose }: VisitorIdCardProps) {
+/**
+ * Shown after a visitor checks in.
+ *
+ * It no longer shows the visit code. Visitors check out with their mobile or ID
+ * number, and the code is for the front desk and admin only.
+ */
+export default function VisitorIdCard({ onClose }: VisitorIdCardProps) {
   const { t } = useTranslation();
   const [countdown, setCountdown] = useState(10);
 
@@ -28,57 +33,12 @@ export default function VisitorIdCard({ visitorId, onClose }: VisitorIdCardProps
   }, [onClose]);
 
   return (
-    <Modal
-      open={true}
-      footer={null}
-      closable={false}
-      centered
-      width="min(480px, 94vw)"
-      styles={{
-        body: { padding: 0 },
-      }}
-    >
-      <div style={{ padding: 32, textAlign: 'center' }}>
+    <Modal open={true} footer={null} closable={false} centered width="min(480px, 94vw)">
+      <div style={{ padding: 24, textAlign: 'center' }}>
+        <CheckCircleOutlined style={{ fontSize: 88, color: 'rgb(127, 188, 66)', marginBottom: 16 }} />
         <Title level={3} style={{ marginBottom: 24, color: 'black' }}>
-          {t('visitor.idGenerated')}
+          {t('visitor.checkedInTitle')}
         </Title>
-
-        <Card
-          style={{
-            background: '#ffffff',
-            border: '2px solid rgb(0, 114, 151)',
-            marginBottom: 24,
-          }}
-          styles={{ body: { padding: 32 } }}
-        >
-          <Text style={{ color: '#000000', fontSize: 14 }}>
-            {t('visitor.visitorIdLabel')}
-          </Text>
-          <Title
-            level={1}
-            style={{
-              color: 'black',
-              fontSize: 56,
-              margin: '12px 0 0',
-              letterSpacing: 2,
-            }}
-          >
-            {visitorId}
-          </Title>
-        </Card>
-
-        <div style={{ marginBottom: 24 }}>
-          <CameraOutlined
-            style={{
-              fontSize: 56,
-              color: 'rgb(0, 114, 151)',
-              marginBottom: 16,
-            }}
-          />
-          <Text strong style={{ display: 'block', fontSize: 16, color: 'black' }}>
-            {t('visitor.photoReminder')}
-          </Text>
-        </div>
 
         <Card
           size="small"
@@ -88,7 +48,7 @@ export default function VisitorIdCard({ visitorId, onClose }: VisitorIdCardProps
             border: '1px solid rgba(0, 114, 151, 0.3)',
           }}
         >
-          <Text strong style={{ color: 'black', fontSize: 14 }}>
+          <Text strong style={{ color: 'black', fontSize: 16 }}>
             {t('visitor.exitInstructions')}
           </Text>
         </Card>

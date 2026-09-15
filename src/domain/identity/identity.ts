@@ -128,6 +128,45 @@ export function inferIdentityType(raw: string): IdentityType {
   return 'passport';
 }
 
+/**
+ * A Saudi mobile number in the form the kiosk stores it, 05XXXXXXXX.
+ *
+ * Also accepts the international forms people type out of habit (+9665…,
+ * 009665…, 9665…) and Arabic-Indic digits. Returns null for anything else.
+ */
+export function normalisePhone(raw: string): string | null {
+  const value = toAsciiDigits(raw ?? '').replace(/[\s\-()]/g, '');
+  if (/^05\d{8}$/.test(value)) return value;
+  const international = /^(?:\+|00)?966(5\d{8})$/.exec(value);
+  return international ? `0${international[1]}` : null;
+}
+
+export type CheckOutInput =
+  | { kind: 'phone'; phone: string }
+  | { kind: 'identity'; idType: IdentityType; idNumber: string };
+
+/**
+ * Read the one check-out field, which takes a mobile number or an ID number.
+ *
+ * A mobile number is recognised first. A number starting 05 would otherwise
+ * pass the iqama pattern, but real iqama numbers start with 2, so the order
+ * decides nothing for a genuine iqama.
+ */
+export function parseCheckOutInput(
+  raw: string,
+): { ok: true; value: CheckOutInput } | { ok: false; reason: 'required' | 'invalid' } {
+  if (normalise(raw ?? '').length === 0) return { ok: false, reason: 'required' };
+
+  const phone = normalisePhone(raw);
+  if (phone) return { ok: true, value: { kind: 'phone', phone } };
+
+  const idType = inferIdentityType(raw);
+  const parsed = parseIdentityNumber(idType, raw);
+  return parsed.ok
+    ? { ok: true, value: { kind: 'identity', idType, idNumber: parsed.value } }
+    : { ok: false, reason: 'invalid' };
+}
+
 /** The i18n key for the message explaining a rejection. */
 export function identityErrorKey(reason: IdentityError): string {
   return `visitor.identity.errors.${reason}`;

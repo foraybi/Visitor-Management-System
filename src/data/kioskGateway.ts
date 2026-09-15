@@ -17,6 +17,7 @@
  */
 
 import type { IdentityType } from '../domain/identity/identity';
+import type { VisitPurpose } from '../domain/visit/visitPurpose';
 
 export interface DirectoryCompany {
   id: string;
@@ -64,6 +65,8 @@ export interface CheckInRequest {
   visitedCompanyId: string;
   floor: number;
   signatureDataUrl: string;
+  /** Visitors only. */
+  visitPurpose?: VisitPurpose;
 }
 
 export interface CheckInSuccess {
@@ -72,11 +75,12 @@ export interface CheckInSuccess {
 }
 
 /**
- * How a visit is closed. A visitor uses the code on their card. An employee is
- * never shown a code, so they use the identity number they checked in with.
+ * How a visit is closed: with the mobile number or the ID number the person
+ * checked in with. The same for visitors and employees. The visit code is for
+ * the front desk and admin, and is not typed at the tablet.
  */
 export type CheckOutRequest =
-  | { visitCode: string }
+  | { phone: string }
   | { idType: IdentityType; idNumber: string };
 
 export type KioskError =

@@ -17,6 +17,8 @@ export interface Visitor {
   id: string;
   /** The four-digit code on the visitor card. Unique within a day. */
   visitCode: string;
+  /** Why a visitor came in. Null for employees and for visits before the list existed. */
+  visitPurpose?: import('../domain/visit/visitPurpose').VisitPurpose | null;
   name: string;
   phone: string;
   email?: string;

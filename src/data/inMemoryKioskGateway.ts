@@ -1,4 +1,4 @@
-import { parseIdentityNumber } from '../domain/identity/identity';
+import { normalisePhone, parseIdentityNumber } from '../domain/identity/identity';
 import type {
   CheckInRequest,
   CheckInSuccess,
@@ -21,7 +21,8 @@ import type {
 export interface InMemoryOptions {
   companies?: Directory['companies'];
   floors?: Directory['floors'];
-  employees?: Array<{ idNumber: string; match: EmployeeMatch }>;
+  /** `phone` is the employee record's mobile number, used to check out by phone. */
+  employees?: Array<{ idNumber: string; match: EmployeeMatch; phone?: string }>;
 }
 
 export interface InMemoryKioskGateway extends KioskGateway {
@@ -49,6 +50,7 @@ export function inMemoryKioskGateway(options: InMemoryOptions = {}): InMemoryKio
     { number: 3, name: 'Third', nameAr: 'الثالث', imageUrl: '' },
   ];
   const employees = new Map(options.employees?.map((e) => [e.idNumber, e.match]));
+  const employeePhones = new Map(options.employees?.map((e) => [e.idNumber, e.phone ?? '']));
 
   const visits: Array<CheckInRequest & CheckInSuccess & { open: boolean; day: number }> = [];
   let offline = false;
@@ -120,29 +122,26 @@ export function inMemoryKioskGateway(options: InMemoryOptions = {}): InMemoryKio
       const blocked = guard<{ name: string }>();
       if (blocked) return blocked;
 
-      if ('idNumber' in request) {
+      // Mirrors kiosk_check_out: today's open visits only, matched by the
+      // visit's own phone or ID, or for an employee by the employee record's phone.
+      let matches: (v: (typeof visits)[number]) => boolean;
+      if ('phone' in request) {
+        const phone = normalisePhone(request.phone);
+        if (!phone) return { ok: false, error: 'invalid_identity' };
+        matches = (v) =>
+          v.phone === phone ||
+          (v.visitorType === 'employee' && employeePhones.get(v.nationalityIdNumber) === phone);
+      } else {
         const parsed = parseIdentityNumber(request.idType, request.idNumber);
         if (!parsed.ok) return { ok: false, error: 'invalid_identity' };
-
-        const open = visits.filter(
-          (v) =>
-            v.visitorType === 'employee' &&
-            v.nationalityIdNumber === parsed.value &&
-            v.day === day &&
-            v.open,
-        );
-        if (open.length === 0) return { ok: false, error: 'no_active_visit' };
-
-        for (const visit of open) visit.open = false;
-        return { ok: true, value: { name: open[0].name } };
+        matches = (v) => v.nationalityIdNumber === parsed.value;
       }
 
-      const code = request.visitCode.trim().padStart(4, '0');
-      const visit = visits.find((v) => v.visitCode === code && v.day === day && v.open);
-      if (!visit) return { ok: false, error: 'no_active_visit' };
+      const open = visits.filter((v) => v.day === day && v.open && matches(v));
+      if (open.length === 0) return { ok: false, error: 'no_active_visit' };
 
-      visit.open = false;
-      return { ok: true, value: { name: visit.name } };
+      for (const visit of open) visit.open = false;
+      return { ok: true, value: { name: open[0].name } };
     },
   };
 }

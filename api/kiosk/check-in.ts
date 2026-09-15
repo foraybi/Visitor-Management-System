@@ -1,6 +1,7 @@
 import { json, readJson } from '../_lib/http.js';
 import { kioskHandler, kioskRpc, todayInRiyadh } from '../_lib/kiosk.js';
 import { parseIdentityNumber, type IdentityType } from '../../src/domain/identity/identity.js';
+import { isVisitPurpose } from '../../src/domain/visit/visitPurpose.js';
 
 /**
  * Record a check-in and return the visitor-facing code.
@@ -27,6 +28,7 @@ interface CheckInBody {
   visitedCompanyId?: unknown;
   floor?: unknown;
   signatureDataUrl?: unknown;
+  visitPurpose?: unknown;
 }
 
 /** A data URL for a signature image. Anything larger is not a signature. */
@@ -74,6 +76,10 @@ export const handleCheckIn = kioskHandler(async (request, tokenHash) => {
         country_code: asString(body.countryCode, 8) ?? 'SA',
         country_name: asString(body.countryName, 80) ?? '',
         signature_data_url: signature,
+        // Visitors only. Not required here: a tablet still running the previous
+        // version of the page sends none, and its check-in must not fail.
+        visit_purpose:
+          visitorType === 'visitor' && isVisitPurpose(body.visitPurpose) ? body.visitPurpose : null,
       },
     },
     'check_in_failed',
